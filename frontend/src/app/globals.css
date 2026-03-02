@@ -1,8 +1,14 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #f4f6fb;
+  --foreground: #1a1d2e;
+  --primary: #2d5bff;
+  --card-bg: #ffffff;
+  --accent-blue: #5b8def;
+  --light-blue: #e8eefb;
+  --dark-text: #1e293b;
+  --gray-text: #64748b;
 }
 
 @theme inline {
@@ -10,17 +16,187 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
-}
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --color-brand-50: #eef2f9;
+  --color-brand-100: #d5dfef;
+  --color-brand-200: #adc0e2;
+  --color-brand-300: #7d9bd0;
+  --color-brand-400: #4d76be;
+  --color-brand-500: #2959ba;
+  --color-brand-600: #2959ba;
+  --color-brand-700: #214a9e;
+  --color-brand-800: #193b7d;
+  --color-brand-900: #112c5c;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-geist-sans), system-ui, -apple-system, sans-serif;
+}
+
+/* ─── Keyframe Animations ─── */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes slideIn {
+  from { opacity: 0; transform: translateX(-30px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+@keyframes slideInRight {
+  from { opacity: 0; transform: translateX(30px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(30px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(0.95); }
+  to   { opacity: 1; transform: scale(1); }
+}
+@keyframes zoomIn {
+  from { opacity: 0; transform: scale(0.8); }
+  to   { opacity: 1; transform: scale(1); }
+}
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50%       { transform: translateY(-20px); }
+}
+@keyframes floatSlow {
+  0%, 100% { transform: translateY(0px) translateX(0px); }
+  50%       { transform: translateY(-15px) translateX(10px); }
+}
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 20px rgba(45, 91, 255, 0.3); }
+  50%       { box-shadow: 0 0 40px rgba(45, 91, 255, 0.6); }
+}
+@keyframes bounce-slow {
+  0%, 100% { transform: translateY(0); }
+  50%       { transform: translateY(-10px); }
+}
+@keyframes spin {
+  0%   { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+@keyframes shimmer {
+  0%   { background-position: -1000px 0; }
+  100% { background-position:  1000px 0; }
+}
+
+/* ─── Animation Utility Classes ─── */
+.animate-fade-in        { animation: fadeIn       0.8s ease-out forwards; }
+.animate-slide-in       { animation: slideIn      0.8s ease-out forwards; }
+.animate-slide-in-right { animation: slideInRight 0.8s ease-out forwards; }
+.animate-slide-down     { animation: slideDown    0.6s ease-out forwards; }
+.animate-slide-up       { animation: slideUp      0.8s ease-out forwards; }
+.animate-scale-in       { animation: scaleIn      0.6s ease-out forwards; }
+.animate-zoom-in        { animation: zoomIn       0.7s ease-out forwards; }
+.animate-float          { animation: float        3s   ease-in-out infinite; }
+.animate-float-slow     { animation: floatSlow    4s   ease-in-out infinite; }
+.animate-bounce-slow    { animation: bounce-slow  3s   ease-in-out infinite; }
+
+/* ─── Stagger Delays ─── */
+.stagger-1 { animation-delay: 0.1s; }
+.stagger-2 { animation-delay: 0.2s; }
+.stagger-3 { animation-delay: 0.3s; }
+.stagger-4 { animation-delay: 0.4s; }
+.stagger-5 { animation-delay: 0.5s; }
+.stagger-6 { animation-delay: 0.6s; }
+
+/* ─── Card Effects ─── */
+.card-hover { transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1); }
+.card-hover:hover {
+  transform: translateY(-8px);
+  box-shadow: 0 20px 40px rgba(45, 91, 255, 0.15);
+}
+.card-float { transition: all 0.3s ease; }
+.card-float:hover { transform: translateY(-5px); }
+
+/* ─── Button Effects ─── */
+.btn-glow {
+  position: relative;
+  overflow: hidden;
+  transition: all 0.3s ease;
+  box-shadow: 0 0 20px rgba(45, 91, 255, 0.3);
+}
+.btn-glow:hover { box-shadow: 0 0 30px rgba(45, 91, 255, 0.5); }
+.btn-glow::before {
+  content: '';
+  position: absolute;
+  top: 50%; left: 50%;
+  width: 0; height: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.3);
+  transform: translate(-50%, -50%);
+  transition: width 0.6s, height 0.6s;
+}
+.btn-glow:hover::before { width: 400px; height: 400px; }
+
+.btn-shimmer { position: relative; overflow: hidden; }
+.btn-shimmer::after {
+  content: '';
+  position: absolute;
+  top: 0; left: -100%;
+  width: 100%; height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+  transition: left 0.5s;
+}
+.btn-shimmer:hover::after { left: 100%; }
+
+/* ─── Gradients ─── */
+.gradient-primary { background: linear-gradient(135deg, #2d5bff, #5b8def); }
+.gradient-bg      { background: linear-gradient(135deg, #f4f6fb 0%, #e8eefb 100%); }
+
+/* ─── Shadows ─── */
+.shadow-card       { box-shadow: 0 4px  20px rgba(45, 91, 255, 0.08); }
+.shadow-card-hover { box-shadow: 0 10px 40px rgba(45, 91, 255, 0.15); }
+
+/* ─── Scrollbar ─── */
+html { scroll-behavior: smooth; }
+::-webkit-scrollbar       { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: #f1f5f9; }
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(to bottom, #2d5bff, #5b8def);
+  border-radius: 10px;
+  border: 2px solid #f1f5f9;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(to bottom, #1e40af, #2d5bff);
+}
+
+/* ─── Loading Spinner ─── */
+.spinner {
+  border: 4px solid rgba(45, 91, 255, 0.1);
+  border-top: 4px solid #2d5bff;
+  border-radius: 50%;
+  width: 48px; height: 48px;
+  animation: spin 0.8s linear infinite;
+}
+
+/* ─── Selection ─── */
+::selection      { background-color: rgba(45, 91, 255, 0.2); color: inherit; }
+::-moz-selection { background-color: rgba(45, 91, 255, 0.2); color: inherit; }
+
+/* ─── Focus ─── */
+:focus-visible { outline: 2px solid #2d5bff; outline-offset: 2px; }
+
+/* ─── Video Container (LMS) ─── */
+.video-container {
+  position: relative;
+  padding-bottom: 56.25%;
+  height: 0;
+  overflow: hidden;
+  border-radius: 12px;
+}
+.video-container iframe,
+.video-container video {
+  position: absolute;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
 }
