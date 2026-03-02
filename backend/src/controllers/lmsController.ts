@@ -14,7 +14,7 @@ export const createProgram = async (
   res: Response
 ): Promise<void> => {
   try {
-    const { name, brief, totalDuration, author, whatYouLearn, fees, courses } =
+    const { name, brief, totalDuration, author, whatYouLearn, fees, courses, sampleVideoUrl, thumbnailPath, category, subCategory } =
       req.body;
 
     if (!name || !brief || !totalDuration || !author) {
@@ -32,6 +32,10 @@ export const createProgram = async (
       author: author.trim(),
       whatYouLearn: whatYouLearn || [],
       fees: fees || 0,
+      sampleVideoUrl: sampleVideoUrl || "",
+      thumbnailPath: thumbnailPath || "",
+      category: category?.trim() || "General",
+      subCategory: subCategory?.trim() || "",
       courses: courses || [],
       isPublished: false,
     });

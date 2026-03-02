@@ -230,8 +230,8 @@ export default function ProgramDetailPage() {
                   </span>
                 </div>
                 <h1 className="text-2xl md:text-3xl font-bold text-white">{program.name}</h1>
-                <p className="text-gray-300 mt-2 text-sm">{program.brief}</p>
-                <div className="flex items-center gap-4 mt-4 text-gray-300 text-sm flex-wrap">
+                <p className="text-gray-200 mt-2 text-base whitespace-pre-line">{program.brief}</p>
+                <div className="flex items-center gap-4 mt-4 text-gray-300 text-base flex-wrap">
                   <span className="flex items-center gap-1">
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
                     {program.author}
@@ -240,7 +240,7 @@ export default function ProgramDetailPage() {
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                     {program.totalDuration}
                   </span>
-                  <span>{program.courses.length} modules · {totalLessons} lessons · {totalTests} tests</span>
+                  <span>{program.courses.length} chapters · {totalLessons} lessons · {totalTests} tests</span>
                 </div>
               </div>
             </div>
@@ -257,7 +257,7 @@ export default function ProgramDetailPage() {
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
                         </svg>
                       </div>
-                      <span className="text-sm text-gray-700">{item}</span>
+                      <span className="text-base text-gray-700">{item}</span>
                     </div>
                   ))}
                 </div>
@@ -297,7 +297,7 @@ export default function ProgramDetailPage() {
             <div className="bg-white rounded-xl border border-gray-200 p-6">
               <h2 className="text-lg font-bold text-gray-900 mb-1">Course Curriculum</h2>
               <p className="text-sm text-gray-500 mb-5">
-                {program.courses.length} sections · {totalLessons} lessons · {totalTests} quizzes
+                {program.courses.length} chapters · {totalLessons} lessons · {totalTests} quizzes
               </p>
               <div className="space-y-2">
                 {program.courses.map((course, idx) => (
@@ -310,9 +310,9 @@ export default function ProgramDetailPage() {
                         <span className="w-6 h-6 rounded-full bg-blue-100 text-blue-700 text-xs font-bold flex items-center justify-center">
                           {idx + 1}
                         </span>
-                        <span className="font-medium text-gray-900 text-sm">{course.title}</span>
+                        <span className="font-medium text-gray-900 text-base">{course.title}</span>
                       </div>
-                      <div className="flex items-center gap-3 text-xs text-gray-400">
+                      <div className="flex items-center gap-3 text-sm text-gray-700">
                         <span>{course.videos.length} lessons</span>
                         <span>{course.tests.length} quizzes</span>
                         <svg className={`w-4 h-4 transition-transform ${openCourse === idx ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -328,8 +328,8 @@ export default function ProgramDetailPage() {
                         {course.videos.map((v, vIdx) => (
                           <div key={vIdx} className="flex items-center gap-3 px-5 py-3">
                             <svg className="w-4 h-4 text-blue-500 flex-shrink-0" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>
-                            <span className="text-sm text-gray-700 flex-1">{v.title}</span>
-                            <span className="text-xs text-gray-400">Video</span>
+                            <span className="text-sm text-gray-800 flex-1">{v.title}</span>
+                            <span className="text-sm text-gray-600">Video</span>
                           </div>
                         ))}
                         {course.tests.map((t, tIdx) => (
@@ -337,8 +337,8 @@ export default function ProgramDetailPage() {
                             <svg className="w-4 h-4 text-amber-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                             </svg>
-                            <span className="text-sm text-gray-700 flex-1">{t.title}</span>
-                            <span className="text-xs text-gray-400">{t.questions.length} Qs</span>
+                            <span className="text-sm text-gray-800 flex-1">{t.title}</span>
+                            <span className="text-sm text-gray-600">{t.questions.length} Qs</span>
                           </div>
                         ))}
                       </div>
@@ -360,19 +360,19 @@ export default function ProgramDetailPage() {
                   {program.fees === 0 ? "Free" : `₹${program.fees.toLocaleString()}`}
                 </div>
                 <div className="space-y-3 mb-6">
-                  <div className="flex items-center gap-2 text-sm text-gray-600">
+                  <div className="flex items-center gap-2 text-base text-gray-800">
                     <svg className="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                     {program.totalDuration} total duration
                   </div>
-                  <div className="flex items-center gap-2 text-sm text-gray-600">
+                  <div className="flex items-center gap-2 text-base text-gray-800">
                     <svg className="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                     {totalLessons} video lessons
                   </div>
-                  <div className="flex items-center gap-2 text-sm text-gray-600">
+                  <div className="flex items-center gap-2 text-base text-gray-800">
                     <svg className="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
                     {totalTests} quizzes
                   </div>
-                  <div className="flex items-center gap-2 text-sm text-gray-600">
+                  <div className="flex items-center gap-2 text-base text-gray-800">
                     <svg className="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"/></svg>
                     Certificate on completion
                   </div>
@@ -385,7 +385,7 @@ export default function ProgramDetailPage() {
                     ) : (
                       <>
                         <div>
-                          <div className="flex justify-between text-xs text-gray-500 mb-1">
+                          <div className="flex justify-between text-sm text-gray-800 mb-1">
                             <span>{progressPercent()}% complete</span>
                             <span>{enrollment.passedTests.length}/{totalTests} tests passed</span>
                           </div>
@@ -474,7 +474,7 @@ export default function ProgramDetailPage() {
                   onClick={() => { setActiveCourseIdx(activeCourseIdx + 1); setLearnView("course"); }}
                   className="px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm transition-all"
                 >
-                  Continue to Next Module →
+                  Continue to Next Chapter →
                 </button>
               ) : enrollment?.status === "COMPLETED" ? (
                 <button
@@ -689,12 +689,12 @@ export default function ProgramDetailPage() {
     <div className="animate-fade-in">
       {/* Top nav */}
       <div className="flex items-center justify-between mb-6">
-        <button onClick={() => setMainView("details")} className="flex items-center gap-2 text-sm text-gray-500 hover:text-blue-600 transition-colors">
+        <button onClick={() => router.push("/user/learning")} className="flex items-center gap-2 text-sm text-gray-500 hover:text-blue-600 transition-colors">
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
-          Course Details
+          Back to Programs
         </button>
         <div className="flex items-center gap-3">
-          <span className="text-sm text-gray-500">{progressPercent()}% complete</span>
+          <span className="text-base text-gray-800">{progressPercent()}% complete</span>
           <div className="w-32 h-2 bg-gray-100 rounded-full overflow-hidden">
             <div className="h-full bg-blue-600 rounded-full transition-all" style={{ width: `${progressPercent()}%` }} />
           </div>
@@ -703,10 +703,10 @@ export default function ProgramDetailPage() {
 
       {/* Header */}
       <div className="bg-gradient-to-r from-blue-700 to-indigo-700 rounded-2xl p-6 mb-6 text-white">
-        <h1 className="text-xl font-bold">{program.name}</h1>
-        <p className="text-blue-100 text-sm mt-1">by {program.author}</p>
-        <div className="flex items-center gap-4 mt-3 text-xs text-blue-200">
-          <span>{program.courses.length} modules</span>
+        <h1 className="text-2xl font-bold">{program.name}</h1>
+        <p className="text-blue-100 text-base mt-1">by {program.author}</p>
+        <div className="flex items-center gap-4 mt-3 text-base text-blue-100">
+          <span>{program.courses.length} chapters</span>
           <span>·</span>
           <span>{totalLessons} videos</span>
           <span>·</span>
@@ -763,28 +763,13 @@ export default function ProgramDetailPage() {
               <div
                 id="printable-certificate"
                 className="relative min-h-[420px] flex flex-col items-center justify-center p-10 text-center overflow-hidden"
-                style={{
-                  backgroundImage: program.certificateTemplatePath
-                    ? `url(${BASE_URL}${program.certificateTemplatePath})`
-                    : undefined,
-                  backgroundSize: "cover",
-                  backgroundPosition: "center",
-                  backgroundRepeat: "no-repeat",
-                }}
               >
-                {/* Fallback decorative background when no template */}
-                {!program.certificateTemplatePath && (
-                  <div className="absolute inset-0 bg-gradient-to-br from-amber-50 via-yellow-50 to-orange-50">
-                    {/* Border decoration */}
-                    <div className="absolute inset-3 border-4 border-amber-300/40 rounded-2xl pointer-events-none" />
-                    <div className="absolute inset-5 border border-amber-200/30 rounded-xl pointer-events-none" />
-                  </div>
-                )}
-
-                {/* Semi-transparent overlay when template exists */}
-                {program.certificateTemplatePath && (
-                  <div className="absolute inset-0 bg-white/30" />
-                )}
+                {/* Decorative certificate background */}
+                <div className="absolute inset-0 bg-gradient-to-br from-amber-50 via-yellow-50 to-orange-50">
+                  {/* Border decoration */}
+                  <div className="absolute inset-3 border-4 border-amber-300/40 rounded-2xl pointer-events-none" />
+                  <div className="absolute inset-5 border border-amber-200/30 rounded-xl pointer-events-none" />
+                </div>
 
                 <div className="relative z-10 space-y-4">
                   {/* Seal */}
@@ -807,14 +792,14 @@ export default function ProgramDetailPage() {
                   <div>
                     <h2 className="text-xl md:text-2xl font-bold text-blue-700">{program.name}</h2>
                     {program.totalDuration && (
-                      <p className="text-sm text-gray-500 mt-1">{program.totalDuration} · by {program.author}</p>
+                      <p className="text-base text-gray-700 mt-1">{program.totalDuration} · by {program.author}</p>
                     )}
                   </div>
 
                   <div className="pt-4">
                     <div className="inline-block border-t-2 border-gray-400 pt-2">
-                      <p className="text-xs text-gray-500">Date of Completion</p>
-                      <p className="text-sm font-semibold text-gray-700">
+                      <p className="text-sm text-gray-700">Date of Completion</p>
+                      <p className="text-base font-semibold text-gray-900">
                         {enrollment.certificateIssuedAt
                           ? new Date(enrollment.certificateIssuedAt).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" })
                           : new Date().toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" })}
@@ -834,7 +819,7 @@ export default function ProgramDetailPage() {
         <div className="lg:col-span-1">
           <div className="bg-white rounded-xl border border-gray-200 overflow-hidden sticky top-4">
             <div className="p-4 bg-gray-50 border-b border-gray-200">
-              <h3 className="font-semibold text-gray-900 text-sm">Course Modules</h3>
+              <h3 className="font-semibold text-gray-900 text-sm">Course Chapters</h3>
             </div>
             <div className="divide-y divide-gray-100">
               {program.courses.map((course, cIdx) => {
@@ -844,13 +829,13 @@ export default function ProgramDetailPage() {
                 return (
                   <button
                     key={cIdx}
-                    onClick={() => { if (unlocked) setActiveCourseIdx(cIdx); else toast.error("Complete previous module's tests to unlock this."); }}
+                    onClick={() => { if (unlocked) setActiveCourseIdx(cIdx); else toast.error("Complete previous chapter's tests to unlock this."); }}
                     className={`w-full text-left px-4 py-3 flex items-center gap-3 transition-all ${active ? "bg-blue-50 border-r-2 border-blue-600" : "hover:bg-gray-50"} ${!unlocked ? "opacity-50 cursor-not-allowed" : ""}`}
                   >
                     <div className={`w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 text-xs font-bold ${completed ? "bg-emerald-100 text-emerald-600" : active ? "bg-blue-100 text-blue-600" : !unlocked ? "bg-gray-100 text-gray-400" : "bg-gray-100 text-gray-600"}`}>
                       {completed ? "✓" : !unlocked ? "🔒" : cIdx + 1}
                     </div>
-                    <span className="text-sm font-medium text-gray-800 truncate">{course.title}</span>
+                    <span className="text-base font-medium text-gray-900 truncate">{course.title}</span>
                   </button>
                 );
               })}
@@ -869,10 +854,10 @@ export default function ProgramDetailPage() {
                   </div>
                   <div>
                     <h2 className="font-bold text-gray-900">{activeCourse.title}</h2>
-                    {activeCourse.description && <p className="text-xs text-gray-500">{activeCourse.description}</p>}
+                    {activeCourse.description && <p className="text-sm text-gray-500">{activeCourse.description}</p>}
                   </div>
                 </div>
-                <div className="flex items-center gap-4 text-xs text-gray-400 mt-2 pl-11">
+                <div className="flex items-center gap-4 text-sm text-gray-700 mt-2 pl-11">
                   <span>{activeCourse.videos.length} videos</span>
                   <span>{activeCourse.tests.length} quizzes</span>
                   <span>{activeCourse.materials.length} materials</span>
@@ -1010,7 +995,7 @@ export default function ProgramDetailPage() {
                   onClick={() => setActiveCourseIdx(activeCourseIdx + 1)}
                   className="w-full py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm transition-all"
                 >
-                  Next Module →
+                  Next Chapter →
                 </button>
               )}
             </>

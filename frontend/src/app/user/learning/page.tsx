@@ -107,7 +107,7 @@ export default function LearningHubPage() {
         <div className="absolute bottom-0 left-1/3 w-32 h-32 bg-cyan-400/10 rounded-full blur-xl" />
         <div className="relative z-10">
           <h1 className="text-3xl font-bold text-white">Explore Courses</h1>
-          <p className="text-blue-100 mt-2 text-sm max-w-md">
+          <p className="text-blue-100 mt-2 text-base max-w-md">
             Build real-world skills with expert-led programs. Learn at your own pace.
           </p>
           <div className="mt-5 max-w-lg relative">
@@ -129,7 +129,7 @@ export default function LearningHubPage() {
       </div>
 
       {/* Stats bar */}
-      <div className="flex items-center gap-6 mb-6 text-sm text-gray-500">
+      <div className="flex items-center gap-6 mb-6 text-base text-gray-700">
         <span><strong className="text-gray-900">{programs.length}</strong> Programs</span>
         <span className="w-px h-4 bg-gray-200" />
         <span><strong className="text-gray-900">{enrollments.length}</strong> Enrolled</span>
@@ -143,7 +143,7 @@ export default function LearningHubPage() {
           <button
             key={tab}
             onClick={() => setCategory(tab)}
-            className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all ${
+            className={`px-4 py-1.5 rounded-full text-base font-medium transition-all ${
               category === tab
                 ? "bg-blue-600 text-white shadow-sm"
                 : "bg-white text-gray-600 border border-gray-200 hover:border-blue-300 hover:text-blue-600"
@@ -162,7 +162,7 @@ export default function LearningHubPage() {
             </svg>
           </div>
           <h3 className="text-lg font-semibold text-gray-900 mb-1">No programs found</h3>
-          <p className="text-sm text-gray-500">Try adjusting your search or filter</p>
+          <p className="text-base text-gray-600">Try adjusting your search or filter</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
@@ -176,7 +176,7 @@ export default function LearningHubPage() {
               <div
                 key={program._id}
                 className="bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 overflow-hidden flex flex-col cursor-pointer group"
-                onClick={() => router.push(`/user/learning/${program._id}`)}
+                onClick={() => router.push(enrolled ? `/user/learning/${program._id}?view=learn` : `/user/learning/${program._id}`)}
               >
                 {/* Thumbnail */}
                 <div className="relative h-44 bg-gradient-to-br from-blue-100 via-indigo-50 to-purple-100 overflow-hidden flex-shrink-0">
@@ -220,10 +220,10 @@ export default function LearningHubPage() {
 
                 {/* Body */}
                 <div className="p-4 flex flex-col flex-1">
-                  <h3 className="font-semibold text-gray-900 text-sm leading-snug mb-1 line-clamp-2 group-hover:text-blue-600 transition-colors">
+                  <h3 className="font-semibold text-gray-900 text-base leading-snug mb-1 line-clamp-2 group-hover:text-blue-600 transition-colors">
                     {program.name}
                   </h3>
-                  <p className="text-xs text-gray-500 mb-2">by {program.author}</p>
+                  <p className="text-sm text-gray-500 mb-2">by {program.author}</p>
 
                   {/* Stars */}
                   <div className="flex items-center gap-0.5 mb-2">
@@ -235,8 +235,8 @@ export default function LearningHubPage() {
                     <span className="text-xs text-gray-400 ml-1">(4.0)</span>
                   </div>
 
-                  <div className="flex items-center gap-3 text-xs text-gray-400 mb-3 flex-wrap">
-                    <span>{program.courses.length} modules</span>
+                  <div className="flex items-center gap-3 text-base text-gray-700 mb-3 flex-wrap">
+                    <span>{program.courses.length} chapters</span>
                     <span>·</span>
                     <span>{lessons} lessons</span>
                     <span>·</span>
@@ -264,7 +264,7 @@ export default function LearningHubPage() {
                     {enrolled ? (
                       <button
                         onClick={(e) => { e.stopPropagation(); router.push(`/user/learning/${program._id}?view=learn`); }}
-                        className={`w-full py-2 rounded-lg text-xs font-semibold transition-all ${enrollment?.status === "COMPLETED" ? "bg-emerald-600 hover:bg-emerald-700 text-white" : "bg-blue-600 hover:bg-blue-700 text-white"}`}
+                        className={`w-full py-2.5 rounded-lg text-sm font-semibold transition-all ${enrollment?.status === "COMPLETED" ? "bg-emerald-600 hover:bg-emerald-700 text-white" : "bg-blue-600 hover:bg-blue-700 text-white"}`}
                       >
                         {enrollment?.status === "COMPLETED" ? "🎓 View Certificate" : "Continue Learning →"}
                       </button>
@@ -272,14 +272,14 @@ export default function LearningHubPage() {
                       <>
                         <button
                           onClick={(e) => { e.stopPropagation(); router.push(`/user/learning/${program._id}`); }}
-                          className="flex-1 py-2 rounded-lg border border-blue-600 text-blue-600 text-xs font-semibold hover:bg-blue-50 transition-all"
+                          className="flex-1 py-2.5 rounded-lg border border-blue-600 text-blue-600 text-sm font-semibold hover:bg-blue-50 transition-all"
                         >
                           View Details
                         </button>
                         <button
                           onClick={(e) => handleEnroll(program._id, e)}
                           disabled={enrolling === program._id}
-                          className="flex-1 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold transition-all disabled:opacity-60"
+                          className="flex-1 py-2.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold transition-all disabled:opacity-60"
                         >
                           {enrolling === program._id ? (
                             <span className="flex items-center justify-center gap-1">

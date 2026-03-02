@@ -105,6 +105,22 @@ export const lmsAPI = {
   // Admin enrollment stats
   getProgramEnrollments: (programId: string) =>
     api.get(`/lms/programs/${programId}/enrollments`),
+
+  // Categories
+  getCategories: () =>
+    api.get("/lms/categories"),
+
+  createCategory: (data: { name: string }) =>
+    api.post("/lms/categories", data),
+
+  addSubCategory: (id: string, data: { subCategory: string }) =>
+    api.put(`/lms/categories/${id}`, data),
+
+  deleteCategory: (id: string) =>
+    api.delete(`/lms/categories/${id}`),
+
+  deleteSubCategory: (id: string, subCategory: string) =>
+    api.delete(`/lms/categories/${id}/sub/${encodeURIComponent(subCategory)}`),
 };
 
 export default api;

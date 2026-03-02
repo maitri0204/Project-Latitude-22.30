@@ -72,11 +72,18 @@ export interface LMSProgram {
   author: string;
   whatYouLearn: string[];
   fees: number;
-  certificateTemplatePath?: string;
+  category: string;
+  subCategory?: string;
   courses: LMSCourse[];
   isPublished: boolean;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface Category {
+  _id: string;
+  name: string;
+  subCategories: string[];
 }
 
 export interface TestScore {

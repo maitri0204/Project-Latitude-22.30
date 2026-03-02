@@ -56,7 +56,8 @@ export interface ILMSProgram extends Document {
   author: string;
   whatYouLearn: string[];
   fees: number;
-  certificateTemplatePath?: string;
+  category: string;
+  subCategory?: string;
   courses: ILMSCourse[];
   isPublished: boolean;
   createdAt: Date;
@@ -137,7 +138,8 @@ const LMSProgramSchema = new Schema<ILMSProgram>(
     author: { type: String, required: true },
     whatYouLearn: [{ type: String }],
     fees: { type: Number, required: true, default: 0 },
-    certificateTemplatePath: { type: String },
+    category: { type: String, required: true, default: "General" },
+    subCategory: { type: String },
     courses: [LMSCourseSchema],
     isPublished: { type: Boolean, default: false },
   },

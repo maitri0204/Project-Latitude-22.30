@@ -18,6 +18,13 @@ import {
   submitTest,
   getProgramEnrollments,
 } from "../controllers/lmsController";
+import {
+  getCategories,
+  createCategory,
+  addSubCategory,
+  deleteCategory,
+  deleteSubCategory,
+} from "../controllers/categoryController";
 
 const router = Router();
 
@@ -76,6 +83,13 @@ router.post(
 // ===== Shared routes =====
 router.get("/programs", getPrograms);
 router.get("/programs/:programId", getProgram);
+
+// ===== Category routes =====
+router.get("/categories", getCategories);
+router.post("/categories", authorize(USER_ROLE.ADMIN), createCategory);
+router.put("/categories/:id", authorize(USER_ROLE.ADMIN), addSubCategory);
+router.delete("/categories/:id", authorize(USER_ROLE.ADMIN), deleteCategory);
+router.delete("/categories/:id/sub/:subCategory", authorize(USER_ROLE.ADMIN), deleteSubCategory);
 
 // ===== User routes (enrollment & learning) =====
 router.post(

@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import toast from "react-hot-toast";
 import { lmsAPI } from "@/lib/api";
-import { LMSProgram, LMSCourse, LMSTest, LMSTestQuestion, LMSVideo, LMSCourseMaterial } from "@/types";
+import { LMSProgram, LMSCourse, LMSTest, LMSTestQuestion, LMSVideo, LMSCourseMaterial, Category } from "@/types";
 
 type ViewMode = "list" | "create" | "edit" | "detail";
 
@@ -23,9 +23,17 @@ export default function AdminProgramsPage() {
     fees: 0,
     sampleVideoUrl: "",
     thumbnailPath: "",
-    certificateTemplatePath: "",
+    category: "",
+    subCategory: "",
     courses: [] as LMSCourse[],
   });
+
+  const briefRef = useRef<HTMLTextAreaElement>(null);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [showCategoryManager, setShowCategoryManager] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState("");
+  const [newSubCategoryName, setNewSubCategoryName] = useState("");
+  const [managingCategoryId, setManagingCategoryId] = useState<string | null>(null);
 
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -42,9 +50,19 @@ export default function AdminProgramsPage() {
     }
   }, []);
 
+  const fetchCategories = useCallback(async () => {
+    try {
+      const res = await lmsAPI.getCategories();
+      setCategories(res.data.categories);
+    } catch {
+      /* silent */
+    }
+  }, []);
+
   useEffect(() => {
     fetchPrograms();
-  }, [fetchPrograms]);
+    fetchCategories();
+  }, [fetchPrograms, fetchCategories]);
 
   const resetForm = () => {
     setFormData({
@@ -56,7 +74,8 @@ export default function AdminProgramsPage() {
       fees: 0,
       sampleVideoUrl: "",
       thumbnailPath: "",
-      certificateTemplatePath: "",
+      category: "",
+      subCategory: "",
       courses: [],
     });
   };
@@ -77,7 +96,8 @@ export default function AdminProgramsPage() {
       fees: program.fees,
       sampleVideoUrl: program.sampleVideoUrl || "",
       thumbnailPath: (program as any).thumbnailPath || "",
-      certificateTemplatePath: (program as any).certificateTemplatePath || "",
+      category: program.category || "",
+      subCategory: program.subCategory || "",
       courses: program.courses,
     });
     setViewMode("edit");
@@ -89,7 +109,7 @@ export default function AdminProgramsPage() {
   };
 
   const handleSave = async () => {
-    if (!formData.name.trim() || !formData.brief.trim() || !formData.totalDuration.trim() || !formData.author.trim()) {
+    if (!formData.name.trim() || !formData.brief.trim() || !formData.totalDuration.trim() || !formData.author.trim() || !formData.category.trim()) {
       toast.error("Please fill all required fields");
       return;
     }
@@ -175,6 +195,108 @@ export default function AdminProgramsPage() {
       toast.error(error?.response?.data?.message || "Upload failed — only JPEG, PNG, PDF allowed");
     } finally {
       setUploading(false);
+    }
+  };
+
+  // ─── Brief text formatting helpers ───
+  const insertBriefList = (type: "bullet" | "number") => {
+    const ta = briefRef.current;
+    if (!ta) return;
+    const start = ta.selectionStart;
+    const end = ta.selectionEnd;
+    const text = formData.brief;
+
+    if (start !== end) {
+      const selectedText = text.substring(start, end);
+      const lines = selectedText.split("\n");
+      const formatted = lines
+        .map((line, i) => {
+          const cleanLine = line.replace(/^(\d+\.\s|•\s)/, "");
+          if (type === "bullet") return `• ${cleanLine}`;
+          return `${i + 1}. ${cleanLine}`;
+        })
+        .join("\n");
+      const newBrief = text.substring(0, start) + formatted + text.substring(end);
+      setFormData({ ...formData, brief: newBrief });
+    } else {
+      let prefix: string;
+      if (type === "bullet") {
+        prefix = "• ";
+      } else {
+        // Detect the last numbered item before the cursor to auto-increment
+        const textBefore = text.substring(0, start);
+        const lines = textBefore.split("\n");
+        let lastNum = 0;
+        for (let i = lines.length - 1; i >= 0; i--) {
+          const match = lines[i].match(/^(\d+)\.\s/);
+          if (match) {
+            lastNum = parseInt(match[1]);
+            break;
+          }
+        }
+        prefix = `${lastNum + 1}. `;
+      }
+      const needsNewline = start > 0 && text[start - 1] !== "\n";
+      const insertion = (needsNewline ? "\n" : "") + prefix;
+      const newBrief = text.substring(0, start) + insertion + text.substring(end);
+      setFormData({ ...formData, brief: newBrief });
+      setTimeout(() => {
+        ta.focus();
+        const pos = start + insertion.length;
+        ta.setSelectionRange(pos, pos);
+      }, 0);
+    }
+  };
+
+  // ─── Category management ───
+  const handleAddCategory = async () => {
+    if (!newCategoryName.trim()) return;
+    try {
+      await lmsAPI.createCategory({ name: newCategoryName.trim() });
+      toast.success("Category added");
+      setNewCategoryName("");
+      fetchCategories();
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || "Failed to add category");
+    }
+  };
+
+  const handleAddSubCategory = async (categoryId: string) => {
+    if (!newSubCategoryName.trim()) return;
+    try {
+      await lmsAPI.addSubCategory(categoryId, { subCategory: newSubCategoryName.trim() });
+      toast.success("Sub-category added");
+      setNewSubCategoryName("");
+      fetchCategories();
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || "Failed to add sub-category");
+    }
+  };
+
+  const handleDeleteCategory = async (categoryId: string) => {
+    if (!confirm("Delete this category and all its sub-categories?")) return;
+    try {
+      await lmsAPI.deleteCategory(categoryId);
+      toast.success("Category deleted");
+      if (formData.category === categories.find((c) => c._id === categoryId)?.name) {
+        setFormData({ ...formData, category: "", subCategory: "" });
+      }
+      fetchCategories();
+    } catch {
+      toast.error("Failed to delete category");
+    }
+  };
+
+  const handleDeleteSubCategory = async (categoryId: string, subCategory: string) => {
+    try {
+      await lmsAPI.deleteSubCategory(categoryId, subCategory);
+      toast.success("Sub-category removed");
+      if (formData.subCategory === subCategory) {
+        setFormData({ ...formData, subCategory: "" });
+      }
+      fetchCategories();
+    } catch {
+      toast.error("Failed to remove sub-category");
     }
   };
 
@@ -278,6 +400,8 @@ export default function AdminProgramsPage() {
     setFormData({ ...formData, courses });
   };
 
+  const selectedCategoryObj = categories.find((c) => c.name === formData.category);
+
   // ─── LIST VIEW ───
   if (viewMode === "list") {
     return (
@@ -285,11 +409,11 @@ export default function AdminProgramsPage() {
         <div className="flex items-center justify-between mb-6">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Programs</h1>
-            <p className="text-sm text-gray-500 mt-1">Manage your learning programs</p>
+            <p className="text-base text-gray-700 mt-1">Manage your learning programs</p>
           </div>
           <button
             onClick={handleCreate}
-            className="px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium text-sm flex items-center gap-2 shadow-sm"
+            className="px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium text-base flex items-center gap-2 shadow-sm"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -310,7 +434,7 @@ export default function AdminProgramsPage() {
               </svg>
             </div>
             <h3 className="text-lg font-semibold text-gray-900 mb-1">No programs yet</h3>
-            <p className="text-sm text-gray-500">Create your first program to get started</p>
+            <p className="text-base text-gray-500">Create your first program to get started</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
@@ -336,10 +460,10 @@ export default function AdminProgramsPage() {
                     <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
                     {/* Badges */}
                     <div className="absolute top-2.5 left-2.5 flex items-center gap-1.5">
-                      <span className={`text-xs font-semibold px-2 py-0.5 rounded-full shadow-sm ${program.fees === 0 ? "bg-emerald-500 text-white" : "bg-amber-500 text-white"}`}>
+                      <span className={`text-sm font-semibold px-2 py-0.5 rounded-full shadow-sm ${program.fees === 0 ? "bg-emerald-500 text-white" : "bg-amber-500 text-white"}`}>
                         {program.fees === 0 ? "Free" : `₹${program.fees.toLocaleString()}`}
                       </span>
-                      <span className={`text-xs font-semibold px-2 py-0.5 rounded-full shadow-sm ${program.isPublished ? "bg-blue-500 text-white" : "bg-gray-600 text-white"}`}>
+                      <span className={`text-sm font-semibold px-2 py-0.5 rounded-full shadow-sm ${program.isPublished ? "bg-blue-500 text-white" : "bg-gray-600 text-white"}`}>
                         {program.isPublished ? "Live" : "Draft"}
                       </span>
                     </div>
@@ -347,29 +471,35 @@ export default function AdminProgramsPage() {
 
                   {/* Card body */}
                   <div className="flex flex-col flex-1 p-4">
-                    <h3 className="font-semibold text-gray-900 text-sm leading-snug line-clamp-2 mb-1.5">{program.name}</h3>
-                    <p className="text-xs text-gray-500 mb-3 line-clamp-2">{program.brief}</p>
-                    <div className="flex items-center gap-1 text-xs text-gray-400 mb-3">
-                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+                    <h3 className="font-semibold text-gray-900 text-base leading-snug line-clamp-2 mb-1.5">{program.name}</h3>
+                    <p className="text-sm text-gray-700 mb-3 line-clamp-2">{program.brief}</p>
+                    {program.category && (
+                      <div className="flex items-center gap-1.5 mb-2">
+                        <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-blue-50 text-blue-700">{program.category}</span>
+                        {program.subCategory && <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">{program.subCategory}</span>}
+                      </div>
+                    )}
+                    <div className="flex items-center gap-1 text-sm text-gray-700 mb-3">
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
                       <span className="truncate">{program.author}</span>
                     </div>
-                    <div className="flex items-center gap-3 text-xs text-gray-400 mb-4 flex-wrap">
+                    <div className="flex items-center gap-3 text-sm text-gray-700 mb-4 flex-wrap">
                       <span className="flex items-center gap-1">
-                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
-                        {program.courses.length} modules
+                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
+                        {program.courses.length} chapters
                       </span>
                       <span className="flex items-center gap-1">
-                        <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                        <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
                         {totalLessons} lessons
                       </span>
                       {totalTests > 0 && (
                         <span className="flex items-center gap-1">
-                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
                           {totalTests} quizzes
                         </span>
                       )}
                       <span className="flex items-center gap-1">
-                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                         {program.totalDuration}
                       </span>
                     </div>
@@ -378,7 +508,7 @@ export default function AdminProgramsPage() {
                     <div className="mt-auto pt-3 border-t border-gray-100 flex items-center gap-1.5">
                       <button
                         onClick={() => handleDetail(program)}
-                        className="flex-1 py-1.5 rounded-lg border border-gray-200 text-gray-600 text-xs font-medium hover:bg-gray-50 transition-colors flex items-center justify-center gap-1"
+                        className="flex-1 py-1.5 rounded-lg border border-gray-200 text-gray-600 text-sm font-medium hover:bg-gray-50 transition-colors flex items-center justify-center gap-1"
                         title="View Details"
                       >
                         <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -389,7 +519,7 @@ export default function AdminProgramsPage() {
                       </button>
                       <button
                         onClick={() => handleEdit(program)}
-                        className="flex-1 py-1.5 rounded-lg border border-blue-200 text-blue-600 text-xs font-medium hover:bg-blue-50 transition-colors flex items-center justify-center gap-1"
+                        className="flex-1 py-1.5 rounded-lg border border-blue-200 text-blue-600 text-sm font-medium hover:bg-blue-50 transition-colors flex items-center justify-center gap-1"
                         title="Edit"
                       >
                         <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -438,7 +568,7 @@ export default function AdminProgramsPage() {
       <div className="animate-fade-in">
         <button
           onClick={() => setViewMode("list")}
-          className="flex items-center gap-2 text-sm text-gray-500 hover:text-blue-600 mb-6 transition-colors"
+          className="flex items-center gap-2 text-base text-gray-500 hover:text-blue-600 mb-6 transition-colors"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -450,7 +580,13 @@ export default function AdminProgramsPage() {
           <div className="flex items-start justify-between mb-6">
             <div>
               <h1 className="text-2xl font-bold text-gray-900">{selectedProgram.name}</h1>
-              <p className="text-gray-500 mt-1">{selectedProgram.brief}</p>
+              <p className="text-base text-gray-800 mt-1 whitespace-pre-line">{selectedProgram.brief}</p>
+              {selectedProgram.category && (
+                <div className="flex items-center gap-2 mt-2">
+                  <span className="text-sm font-medium px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-700">{selectedProgram.category}</span>
+                  {selectedProgram.subCategory && <span className="text-sm font-medium px-2.5 py-0.5 rounded-full bg-gray-100 text-gray-600">{selectedProgram.subCategory}</span>}
+                </div>
+              )}
             </div>
             <span className={`px-3 py-1 rounded-full text-sm font-medium ${selectedProgram.isPublished ? "bg-emerald-50 text-emerald-600" : "bg-amber-50 text-amber-600"}`}>
               {selectedProgram.isPublished ? "Published" : "Draft"}
@@ -459,29 +595,29 @@ export default function AdminProgramsPage() {
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
             <div className="bg-gray-50 rounded-lg p-4">
-              <p className="text-xs text-gray-500">Author</p>
-              <p className="font-semibold text-gray-900 mt-1">{selectedProgram.author}</p>
+              <p className="text-sm text-gray-700">Author</p>
+              <p className="font-semibold text-gray-900 text-base mt-1">{selectedProgram.author}</p>
             </div>
             <div className="bg-gray-50 rounded-lg p-4">
-              <p className="text-xs text-gray-500">Duration</p>
-              <p className="font-semibold text-gray-900 mt-1">{selectedProgram.totalDuration}</p>
+              <p className="text-sm text-gray-700">Duration</p>
+              <p className="font-semibold text-gray-900 text-base mt-1">{selectedProgram.totalDuration}</p>
             </div>
             <div className="bg-gray-50 rounded-lg p-4">
-              <p className="text-xs text-gray-500">Courses</p>
-              <p className="font-semibold text-gray-900 mt-1">{selectedProgram.courses.length}</p>
+              <p className="text-sm text-gray-700">Courses / Chapters</p>
+              <p className="font-semibold text-gray-900 text-base mt-1">{selectedProgram.courses.length}</p>
             </div>
             <div className="bg-gray-50 rounded-lg p-4">
-              <p className="text-xs text-gray-500">Fees</p>
-              <p className="font-semibold text-gray-900 mt-1">{selectedProgram.fees > 0 ? `₹${selectedProgram.fees}` : "Free"}</p>
+              <p className="text-sm text-gray-700">Fees</p>
+              <p className="font-semibold text-gray-900 text-base mt-1">{selectedProgram.fees > 0 ? `₹${selectedProgram.fees}` : "Free"}</p>
             </div>
           </div>
 
           {selectedProgram.whatYouLearn.length > 0 && (
             <div className="mb-6">
-              <h3 className="font-semibold text-gray-900 mb-2">What You&apos;ll Learn</h3>
+              <h3 className="font-semibold text-gray-900 text-lg mb-2">What You&apos;ll Learn</h3>
               <ul className="space-y-1">
                 {selectedProgram.whatYouLearn.map((item, i) => (
-                  <li key={i} className="flex items-start gap-2 text-sm text-gray-500">
+                  <li key={i} className="flex items-start gap-2 text-base text-gray-800">
                     <span className="text-blue-600 mt-0.5">✓</span>
                     {item}
                   </li>
@@ -491,13 +627,13 @@ export default function AdminProgramsPage() {
           )}
 
           <div>
-            <h3 className="font-semibold text-gray-900 mb-3">Courses ({selectedProgram.courses.length})</h3>
+            <h3 className="font-semibold text-gray-900 text-lg mb-3">Courses / Chapters ({selectedProgram.courses.length})</h3>
             <div className="space-y-3">
               {selectedProgram.courses.map((course, i) => (
                 <div key={i} className="bg-gray-50 rounded-lg p-4">
-                  <h4 className="font-medium text-gray-900">{course.title}</h4>
-                  {course.description && <p className="text-sm text-gray-500 mt-1">{course.description}</p>}
-                  <div className="flex gap-4 mt-2 text-xs text-gray-400">
+                  <h4 className="font-medium text-gray-900 text-base">{course.title}</h4>
+                  {course.description && <p className="text-sm text-gray-700 mt-1">{course.description}</p>}
+                  <div className="flex gap-4 mt-2 text-sm text-gray-700">
                     <span>🎥 {course.videos.length} videos</span>
                     <span>📝 {course.tests.length} tests</span>
                     <span>📎 {course.materials.length} materials</span>
@@ -516,7 +652,7 @@ export default function AdminProgramsPage() {
     <div className="animate-fade-in">
       <button
         onClick={() => setViewMode("list")}
-        className="flex items-center gap-2 text-sm text-gray-500 hover:text-blue-600 mb-6 transition-colors"
+        className="flex items-center gap-2 text-base text-gray-500 hover:text-blue-600 mb-6 transition-colors"
       >
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -531,150 +667,300 @@ export default function AdminProgramsPage() {
 
         {/* Basic Info */}
         <div className="space-y-4 mb-8">
-          <h3 className="text-base font-semibold text-gray-900">Basic Information</h3>
+          <h3 className="text-lg font-semibold text-gray-900">Basic Information</h3>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Program Name <span className="text-red-500">*</span></label>
+              <label className="block text-base font-medium text-gray-700 mb-1">Program Name <span className="text-red-500">*</span></label>
               <input
                 type="text"
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 text-sm outline-none"
+                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 text-base outline-none"
                 placeholder="e.g., Full Stack Development"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Author <span className="text-red-500">*</span></label>
+              <label className="block text-base font-medium text-gray-700 mb-1">Author <span className="text-red-500">*</span></label>
               <input
                 type="text"
                 value={formData.author}
                 onChange={(e) => setFormData({ ...formData, author: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 text-sm outline-none"
+                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 text-base outline-none"
                 placeholder="e.g., John Doe"
               />
             </div>
           </div>
 
+          {/* Brief Description with rich text toolbar */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Brief Description <span className="text-red-500">*</span></label>
-            <textarea
-              value={formData.brief}
-              onChange={(e) => setFormData({ ...formData, brief: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 text-sm outline-none"
-              rows={3}
-              placeholder="Describe your program..."
-            />
+            <label className="block text-base font-medium text-gray-700 mb-1">Brief Description <span className="text-red-500">*</span></label>
+            <div className="border border-gray-300 rounded-lg overflow-hidden focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-blue-500">
+              <div className="flex items-center gap-1 px-2 py-1.5 bg-gray-50 border-b border-gray-200">
+                <button
+                  type="button"
+                  onClick={() => insertBriefList("bullet")}
+                  className="flex items-center gap-1.5 px-3 py-1 rounded text-sm font-medium text-gray-600 hover:bg-gray-200 transition-colors"
+                  title="Insert Bullet List"
+                >
+                  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                    <circle cx="4" cy="6" r="1.5" fill="currentColor" stroke="none" />
+                    <circle cx="4" cy="12" r="1.5" fill="currentColor" stroke="none" />
+                    <circle cx="4" cy="18" r="1.5" fill="currentColor" stroke="none" />
+                    <line x1="9" y1="6" x2="21" y2="6" />
+                    <line x1="9" y1="12" x2="21" y2="12" />
+                    <line x1="9" y1="18" x2="21" y2="18" />
+                  </svg>
+                  • Bullet List
+                </button>
+                <div className="w-px h-5 bg-gray-300" />
+                <button
+                  type="button"
+                  onClick={() => insertBriefList("number")}
+                  className="flex items-center gap-1.5 px-3 py-1 rounded text-sm font-medium text-gray-600 hover:bg-gray-200 transition-colors"
+                  title="Insert Numbered List"
+                >
+                  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+                    <text x="1" y="8" fontSize="7" fontFamily="sans-serif">1.</text>
+                    <text x="1" y="14.5" fontSize="7" fontFamily="sans-serif">2.</text>
+                    <text x="1" y="21" fontSize="7" fontFamily="sans-serif">3.</text>
+                    <line x1="11" y1="6" x2="22" y2="6" stroke="currentColor" strokeWidth="2" />
+                    <line x1="11" y1="12.5" x2="22" y2="12.5" stroke="currentColor" strokeWidth="2" />
+                    <line x1="11" y1="19" x2="22" y2="19" stroke="currentColor" strokeWidth="2" />
+                  </svg>
+                  1. Numbered List
+                </button>
+              </div>
+              <textarea
+                ref={briefRef}
+                value={formData.brief}
+                onChange={(e) => setFormData({ ...formData, brief: e.target.value })}
+                className="w-full px-3 py-2.5 text-gray-900 text-base outline-none resize-y"
+                rows={5}
+                placeholder="Describe your program... Use the toolbar above to add bullet or numbered lists."
+              />
+            </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Total Duration <span className="text-red-500">*</span></label>
+              <label className="block text-base font-medium text-gray-700 mb-1">Total Duration <span className="text-red-500">*</span></label>
               <input
                 type="text"
                 value={formData.totalDuration}
                 onChange={(e) => setFormData({ ...formData, totalDuration: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 text-sm outline-none"
+                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 text-base outline-none"
                 placeholder="e.g., 3 months"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Fees (₹)</label>
+              <label className="block text-base font-medium text-gray-700 mb-1">Fees (₹)</label>
               <input
                 type="number"
                 value={formData.fees}
                 onChange={(e) => setFormData({ ...formData, fees: Number(e.target.value) })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 text-sm outline-none"
+                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 text-base outline-none"
                 min={0}
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Sample Video URL</label>
+              <label className="block text-base font-medium text-gray-700 mb-1">Sample Video URL</label>
               <input
                 type="url"
                 value={formData.sampleVideoUrl}
                 onChange={(e) => setFormData({ ...formData, sampleVideoUrl: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 text-sm outline-none"
+                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 text-base outline-none"
                 placeholder="https://..."
               />
             </div>
           </div>
 
-          {/* Thumbnail & Certificate uploads */}
+          {/* Thumbnail upload only — certificate template removed */}
+          <div>
+            <label className="block text-base font-medium text-gray-700 mb-1">
+              Thumbnail
+              <span className="ml-1 text-sm text-gray-400 font-normal">(Recommended: 1280 × 720 px, JPG/PNG)</span>
+            </label>
+            <label className="flex flex-col items-center justify-center w-full max-w-md h-32 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-blue-400 hover:bg-blue-50 transition-colors">
+              {formData.thumbnailPath ? (
+                <div className="flex flex-col items-center gap-1 px-3 text-center">
+                  <svg className="w-6 h-6 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                  <span className="text-sm text-emerald-600 font-medium">Uploaded</span>
+                  <span className="text-sm text-gray-400 truncate max-w-full">{formData.thumbnailPath.split("/").pop()}</span>
+                </div>
+              ) : (
+                <div className="flex flex-col items-center gap-1">
+                  <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                  <span className="text-sm text-gray-500">Click to upload thumbnail</span>
+                  <span className="text-sm text-gray-400">1280 × 720 px</span>
+                </div>
+              )}
+              <input
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) =>
+                  handleFileUpload(e, (url) => {
+                    setFormData({ ...formData, thumbnailPath: url });
+                  })
+                }
+              />
+            </label>
+          </div>
+
+          {/* Category & Sub-category */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Thumbnail
-                <span className="ml-1 text-xs text-gray-400 font-normal">(Recommended: 1280 × 720 px, JPG/PNG)</span>
-              </label>
-              <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-blue-400 hover:bg-blue-50 transition-colors">
-                {formData.thumbnailPath ? (
-                  <div className="flex flex-col items-center gap-1 px-3 text-center">
-                    <svg className="w-6 h-6 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                    <span className="text-xs text-emerald-600 font-medium">Uploaded</span>
-                    <span className="text-xs text-gray-400 truncate max-w-full">{formData.thumbnailPath.split("/").pop()}</span>
-                  </div>
-                ) : (
-                  <div className="flex flex-col items-center gap-1">
-                    <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                    </svg>
-                    <span className="text-xs text-gray-500">Click to upload thumbnail</span>
-                    <span className="text-xs text-gray-400">1280 × 720 px</span>
-                  </div>
-                )}
-                <input
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={(e) =>
-                    handleFileUpload(e, (url) => {
-                      setFormData({ ...formData, thumbnailPath: url });
-                    })
-                  }
-                />
-              </label>
+              <label className="block text-base font-medium text-gray-700 mb-1">Category <span className="text-red-500">*</span></label>
+              <select
+                value={formData.category}
+                onChange={(e) => setFormData({ ...formData, category: e.target.value, subCategory: "" })}
+                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 text-base outline-none bg-white"
+              >
+                <option value="">Select category...</option>
+                {categories.map((cat) => (
+                  <option key={cat._id} value={cat.name}>{cat.name}</option>
+                ))}
+              </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Certificate Template
-                <span className="ml-1 text-xs text-gray-400 font-normal">(Recommended: 1920 × 1080 px, PNG/PDF)</span>
-              </label>
-              <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-blue-400 hover:bg-blue-50 transition-colors">
-                {formData.certificateTemplatePath ? (
-                  <div className="flex flex-col items-center gap-1 px-3 text-center">
-                    <svg className="w-6 h-6 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                    <span className="text-xs text-emerald-600 font-medium">Uploaded</span>
-                    <span className="text-xs text-gray-400 truncate max-w-full">{formData.certificateTemplatePath.split("/").pop()}</span>
-                  </div>
-                ) : (
-                  <div className="flex flex-col items-center gap-1">
-                    <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                    </svg>
-                    <span className="text-xs text-gray-500">Click to upload certificate</span>
-                    <span className="text-xs text-gray-400">1920 × 1080 px (A4 landscape)</span>
-                  </div>
-                )}
-                <input
-                  type="file"
-                  accept="image/*,application/pdf"
-                  className="hidden"
-                  onChange={(e) =>
-                    handleFileUpload(e, (url) => {
-                      setFormData({ ...formData, certificateTemplatePath: url });
-                    })
-                  }
-                />
-              </label>
+              <label className="block text-base font-medium text-gray-700 mb-1">Sub-category <span className="text-gray-400 font-normal">(optional)</span></label>
+              <select
+                value={formData.subCategory}
+                onChange={(e) => setFormData({ ...formData, subCategory: e.target.value })}
+                className={`w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 text-base outline-none bg-white ${!formData.category ? "opacity-60 cursor-not-allowed" : ""}`}
+                disabled={!formData.category}
+              >
+                <option value="">
+                  {!formData.category
+                    ? "Select a category first..."
+                    : selectedCategoryObj && selectedCategoryObj.subCategories.length === 0
+                    ? "No sub-categories — add via Manage Categories"
+                    : "Select sub-category (optional)..."}
+                </option>
+                {selectedCategoryObj?.subCategories.map((sub) => (
+                  <option key={sub} value={sub}>{sub}</option>
+                ))}
+              </select>
             </div>
           </div>
+
+          {/* Manage Categories toggle */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">What You&apos;ll Learn</label>
+            <button
+              type="button"
+              onClick={() => setShowCategoryManager(!showCategoryManager)}
+              className="text-sm text-blue-600 font-medium hover:underline flex items-center gap-1"
+            >
+              <svg className={`w-3.5 h-3.5 transition-transform ${showCategoryManager ? "rotate-90" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+              Manage Categories
+            </button>
+
+            {showCategoryManager && (
+              <div className="mt-3 p-4 bg-gray-50 rounded-lg border border-gray-200">
+                {/* Add new category */}
+                <div className="flex gap-2 mb-4">
+                  <input
+                    type="text"
+                    value={newCategoryName}
+                    onChange={(e) => setNewCategoryName(e.target.value)}
+                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="New category name..."
+                    onKeyDown={(e) => e.key === "Enter" && handleAddCategory()}
+                  />
+                  <button
+                    type="button"
+                    onClick={handleAddCategory}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
+                  >
+                    Add Category
+                  </button>
+                </div>
+
+                {/* Category list */}
+                {categories.length === 0 ? (
+                  <p className="text-sm text-gray-400 text-center py-3">No categories yet. Add one above.</p>
+                ) : (
+                  <div className="space-y-3">
+                    {categories.map((cat) => (
+                      <div key={cat._id} className="bg-white rounded-lg p-3 border border-gray-200">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="font-medium text-gray-900 text-sm">{cat.name}</span>
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setManagingCategoryId(managingCategoryId === cat._id ? null : cat._id);
+                                setNewSubCategoryName("");
+                              }}
+                              className="text-xs text-blue-600 hover:underline"
+                            >
+                              {managingCategoryId === cat._id ? "Close" : "+ Sub-category"}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteCategory(cat._id)}
+                              className="text-xs text-red-500 hover:underline"
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Sub-categories */}
+                        {cat.subCategories.length > 0 && (
+                          <div className="flex flex-wrap gap-1.5 mb-2">
+                            {cat.subCategories.map((sub) => (
+                              <span key={sub} className="inline-flex items-center gap-1 text-xs bg-gray-100 text-gray-700 px-2 py-0.5 rounded-full">
+                                {sub}
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteSubCategory(cat._id, sub)}
+                                  className="text-red-400 hover:text-red-600 font-bold"
+                                >
+                                  ×
+                                </button>
+                              </span>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* Add sub-category form */}
+                        {managingCategoryId === cat._id && (
+                          <div className="flex gap-2 mt-2">
+                            <input
+                              type="text"
+                              value={newSubCategoryName}
+                              onChange={(e) => setNewSubCategoryName(e.target.value)}
+                              className="flex-1 px-2.5 py-1.5 border border-gray-300 rounded-lg text-xs text-gray-900 outline-none focus:ring-2 focus:ring-blue-500"
+                              placeholder="Sub-category name..."
+                              onKeyDown={(e) => e.key === "Enter" && handleAddSubCategory(cat._id)}
+                            />
+                            <button
+                              type="button"
+                              onClick={() => handleAddSubCategory(cat._id)}
+                              className="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-medium hover:bg-blue-700"
+                            >
+                              Add
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          <div>
+            <label className="block text-base font-medium text-gray-700 mb-1">What You&apos;ll Learn</label>
             {formData.whatYouLearn.map((item, i) => (
               <div key={i} className="flex gap-2 mb-2">
                 <input
@@ -685,7 +971,7 @@ export default function AdminProgramsPage() {
                     updated[i] = e.target.value;
                     setFormData({ ...formData, whatYouLearn: updated });
                   }}
-                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 text-sm outline-none"
+                  className="flex-1 px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 text-base outline-none"
                   placeholder="Learning outcome..."
                 />
                 {formData.whatYouLearn.length > 1 && (
@@ -707,10 +993,10 @@ export default function AdminProgramsPage() {
           </div>
         </div>
 
-        {/* Courses Section */}
+        {/* Courses / Chapters Section */}
         <div className="mb-8">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-base font-semibold text-gray-900">Courses</h3>
+            <h3 className="text-lg font-semibold text-gray-900">Courses / Chapters</h3>
             <button
               onClick={addCourse}
               className="text-sm text-blue-600 font-medium hover:underline flex items-center gap-1"
@@ -718,14 +1004,14 @@ export default function AdminProgramsPage() {
               <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
               </svg>
-              Add Course
+              Add Course / Chapter
             </button>
           </div>
 
           {formData.courses.map((course, cIdx) => (
             <div key={cIdx} className="bg-gray-50 rounded-lg p-5 mb-4">
               <div className="flex items-center justify-between mb-3">
-                <h4 className="font-semibold text-gray-900">Course {cIdx + 1}</h4>
+                <h4 className="font-semibold text-gray-900 text-base">Course / Chapter {cIdx + 1}</h4>
                 <button onClick={() => removeCourse(cIdx)} className="text-red-400 hover:text-red-600 text-sm">
                   Remove
                 </button>
@@ -736,23 +1022,23 @@ export default function AdminProgramsPage() {
                   type="text"
                   value={course.title}
                   onChange={(e) => updateCourse(cIdx, "title", e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 text-sm outline-none"
-                  placeholder="Course title"
+                  className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 text-base outline-none"
+                  placeholder="Course / Chapter title"
                 />
                 <input
                   type="text"
                   value={course.description || ""}
                   onChange={(e) => updateCourse(cIdx, "description", e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 text-sm outline-none"
-                  placeholder="Course description"
+                  className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 text-base outline-none"
+                  placeholder="Course / Chapter description"
                 />
               </div>
 
               {/* Videos */}
               <div className="mb-3">
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs font-semibold text-gray-500">VIDEOS</span>
-                  <button onClick={() => addVideo(cIdx)} className="text-xs text-blue-600 hover:underline">
+                  <span className="text-sm font-semibold text-gray-500">VIDEOS</span>
+                  <button onClick={() => addVideo(cIdx)} className="text-sm text-blue-600 hover:underline">
                     + Add Video
                   </button>
                 </div>
@@ -762,17 +1048,17 @@ export default function AdminProgramsPage() {
                       type="text"
                       value={vid.title}
                       onChange={(e) => updateVideo(cIdx, vIdx, "title", e.target.value)}
-                      className="flex-1 px-3 py-1.5 rounded-lg border border-gray-300 text-xs text-gray-900"
+                      className="flex-1 px-3 py-1.5 rounded-lg border border-gray-300 text-sm text-gray-900"
                       placeholder="Video title"
                     />
                     <input
                       type="url"
                       value={vid.link}
                       onChange={(e) => updateVideo(cIdx, vIdx, "link", e.target.value)}
-                      className="flex-1 px-3 py-1.5 rounded-lg border border-gray-300 text-xs text-gray-900"
+                      className="flex-1 px-3 py-1.5 rounded-lg border border-gray-300 text-sm text-gray-900"
                       placeholder="Video URL"
                     />
-                    <button onClick={() => removeVideo(cIdx, vIdx)} className="text-red-400 text-xs px-2">
+                    <button onClick={() => removeVideo(cIdx, vIdx)} className="text-red-400 text-sm px-2">
                       ×
                     </button>
                   </div>
@@ -782,15 +1068,15 @@ export default function AdminProgramsPage() {
               {/* Materials upload */}
               <div className="mb-3">
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs font-semibold text-gray-500">MATERIALS</span>
-                  <label className="text-xs text-blue-600 hover:underline cursor-pointer">
+                  <span className="text-sm font-semibold text-gray-500">MATERIALS</span>
+                  <label className="text-sm text-blue-600 hover:underline cursor-pointer">
                     + Upload Material
                     <input
                       type="file"
                       className="hidden"
                       accept="image/jpeg,image/png,application/pdf"
                       onChange={(e) =>
-                        handleMaterialUpload(e, (url, fileInfo) => {
+                        handleMaterialUpload(e, (_url, fileInfo) => {
                           const courses = [...formData.courses];
                           courses[cIdx].materials.push({
                             ...fileInfo,
@@ -803,7 +1089,7 @@ export default function AdminProgramsPage() {
                   </label>
                 </div>
                 {course.materials.map((mat, mIdx) => (
-                  <div key={mIdx} className="flex items-center gap-2 mb-1 text-xs text-gray-500">
+                  <div key={mIdx} className="flex items-center gap-2 mb-1 text-sm text-gray-500">
                     <span>📎 {mat.originalName}</span>
                     <button
                       onClick={() => {
@@ -822,8 +1108,8 @@ export default function AdminProgramsPage() {
               {/* Tests */}
               <div>
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs font-semibold text-gray-500">TESTS</span>
-                  <button onClick={() => addTest(cIdx)} className="text-xs text-blue-600 hover:underline">
+                  <span className="text-sm font-semibold text-gray-500">TESTS</span>
+                  <button onClick={() => addTest(cIdx)} className="text-sm text-blue-600 hover:underline">
                     + Add Test
                   </button>
                 </div>
@@ -834,7 +1120,7 @@ export default function AdminProgramsPage() {
                         type="text"
                         value={test.title}
                         onChange={(e) => updateTest(cIdx, tIdx, "title", e.target.value)}
-                        className="font-medium text-sm border-b border-transparent focus:border-blue-500 outline-none"
+                        className="font-medium text-base border-b border-transparent focus:border-blue-500 outline-none"
                         placeholder="Test title"
                       />
                       <div className="flex items-center gap-2">
@@ -842,10 +1128,10 @@ export default function AdminProgramsPage() {
                           type="number"
                           value={test.minimumPassingMarks || 0}
                           onChange={(e) => updateTest(cIdx, tIdx, "minimumPassingMarks", Number(e.target.value))}
-                          className="w-20 px-2 py-1 rounded-lg border border-gray-300 text-xs text-gray-900"
+                          className="w-20 px-2 py-1 rounded-lg border border-gray-300 text-sm text-gray-900"
                           placeholder="Min marks"
                         />
-                        <button onClick={() => removeTest(cIdx, tIdx)} className="text-red-400 text-xs">
+                        <button onClick={() => removeTest(cIdx, tIdx)} className="text-red-400 text-sm">
                           Remove
                         </button>
                       </div>
@@ -854,15 +1140,15 @@ export default function AdminProgramsPage() {
                     {test.questions.map((q, qIdx) => (
                       <div key={qIdx} className="bg-gray-50 rounded-lg p-3 mb-2">
                         <div className="flex items-start justify-between gap-2 mb-2">
-                          <span className="text-xs font-medium text-gray-400 mt-1">Q{qIdx + 1}</span>
+                          <span className="text-sm font-medium text-gray-400 mt-1">Q{qIdx + 1}</span>
                           <input
                             type="text"
                             value={q.questionText}
                             onChange={(e) => updateQuestion(cIdx, tIdx, qIdx, "questionText", e.target.value)}
-                            className="flex-1 px-3 py-1.5 rounded-lg border border-gray-300 text-xs text-gray-900"
+                            className="flex-1 px-3 py-1.5 rounded-lg border border-gray-300 text-sm text-gray-900"
                             placeholder="Question text"
                           />
-                          <button onClick={() => removeQuestion(cIdx, tIdx, qIdx)} className="text-red-400 text-xs mt-1">
+                          <button onClick={() => removeQuestion(cIdx, tIdx, qIdx)} className="text-red-400 text-sm mt-1">
                             ×
                           </button>
                         </div>
@@ -880,7 +1166,7 @@ export default function AdminProgramsPage() {
                                 type="text"
                                 value={opt}
                                 onChange={(e) => updateOption(cIdx, tIdx, qIdx, oIdx, e.target.value)}
-                                className="flex-1 px-2 py-1 rounded-lg border border-gray-300 text-xs text-gray-900"
+                                className="flex-1 px-2 py-1 rounded-lg border border-gray-300 text-sm text-gray-900"
                                 placeholder={`Option ${oIdx + 1}`}
                               />
                             </div>
@@ -888,22 +1174,22 @@ export default function AdminProgramsPage() {
                         </div>
                         <div className="flex gap-2">
                           <div className="flex items-center gap-1">
-                            <label className="text-xs text-gray-400">Score:</label>
+                            <label className="text-sm text-gray-400">Score:</label>
                             <input
                               type="number"
                               value={q.score}
                               onChange={(e) => updateQuestion(cIdx, tIdx, qIdx, "score", Number(e.target.value))}
-                              className="w-14 px-2 py-0.5 rounded-lg border border-gray-300 text-xs text-gray-900"
+                              className="w-14 px-2 py-0.5 rounded-lg border border-gray-300 text-sm text-gray-900"
                               min={0}
                             />
                           </div>
                           <div className="flex items-center gap-1">
-                            <label className="text-xs text-gray-400">Negative:</label>
+                            <label className="text-sm text-gray-400">Negative:</label>
                             <input
                               type="number"
                               value={q.negativeMarking}
                               onChange={(e) => updateQuestion(cIdx, tIdx, qIdx, "negativeMarking", Number(e.target.value))}
-                              className="w-14 px-2 py-0.5 rounded-lg border border-gray-300 text-xs text-gray-900"
+                              className="w-14 px-2 py-0.5 rounded-lg border border-gray-300 text-sm text-gray-900"
                               min={0}
                             />
                           </div>
@@ -913,7 +1199,7 @@ export default function AdminProgramsPage() {
 
                     <button
                       onClick={() => addQuestion(cIdx, tIdx)}
-                      className="text-xs text-blue-600 hover:underline mt-1"
+                      className="text-sm text-blue-600 hover:underline mt-1"
                     >
                       + Add Question
                     </button>
@@ -929,13 +1215,13 @@ export default function AdminProgramsPage() {
           <button
             onClick={handleSave}
             disabled={saving || uploading}
-            className="px-8 py-3 rounded-lg bg-blue-600 text-white font-medium hover:bg-blue-700 transition-all disabled:opacity-50"
+            className="px-8 py-3 rounded-lg bg-blue-600 text-white font-medium text-base hover:bg-blue-700 transition-all disabled:opacity-50"
           >
             {saving ? "Saving..." : viewMode === "create" ? "Create Program" : "Save Changes"}
           </button>
           <button
             onClick={() => setViewMode("list")}
-            className="px-8 py-3 rounded-lg border border-gray-300 text-gray-700 font-medium hover:bg-gray-50 transition-all"
+            className="px-8 py-3 rounded-lg border border-gray-300 text-gray-700 font-medium text-base hover:bg-gray-50 transition-all"
           >
             Cancel
           </button>
