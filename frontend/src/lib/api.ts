@@ -80,6 +80,12 @@ export const lmsAPI = {
       headers: { "Content-Type": "multipart/form-data" },
     }),
 
+  // Material upload — restricted to JPEG, PNG, PDF
+  uploadMaterial: (formData: FormData) =>
+    api.post("/lms/upload/material", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    }),
+
   // Enrollments
   enrollInProgram: (programId: string) =>
     api.post(`/lms/programs/${programId}/enroll`),

@@ -34,6 +34,7 @@ export default function ProgramDetailPage() {
   const [enrollment, setEnrollment] = useState<LMSEnrollment | null>(null);
   const [loading, setLoading] = useState(true);
   const [enrolling, setEnrolling] = useState(false);
+  const [currentUser, setCurrentUser] = useState<{ firstName: string; middleName?: string; lastName: string } | null>(null);
 
   // "details" = landing/info page | "learn" = actual learning view
   const [mainView, setMainView] = useState<"details" | "learn">(
@@ -74,6 +75,16 @@ export default function ProgramDetailPage() {
   }, [programId, router]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
+
+  // Load current user from localStorage
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const userStr = localStorage.getItem("user");
+      if (userStr) {
+        try { setCurrentUser(JSON.parse(userStr)); } catch {}
+      }
+    }
+  }, []);
 
   // ── Enrollment helpers ───────────────────────────────────────────────────
 
@@ -253,6 +264,35 @@ export default function ProgramDetailPage() {
               </div>
             )}
 
+            {/* Sample Video Preview */}
+            {(program.sampleVideoUrl || program.sampleVideoPath) && (
+              <div className="bg-white rounded-xl border border-gray-200 p-6">
+                <h2 className="text-lg font-bold text-gray-900 mb-1 flex items-center gap-2">
+                  <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-blue-100">
+                    <svg className="w-4 h-4 text-blue-600" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                  </span>
+                  Course Preview
+                </h2>
+                <p className="text-sm text-gray-500 mb-4">Watch a free preview of this course</p>
+                <div className="video-container rounded-xl overflow-hidden shadow-sm border border-gray-100">
+                  {program.sampleVideoUrl ? (
+                    <iframe
+                      src={getEmbedUrl(program.sampleVideoUrl)}
+                      title="Course Preview"
+                      allowFullScreen
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    />
+                  ) : program.sampleVideoPath ? (
+                    <video
+                      src={`${BASE_URL}${program.sampleVideoPath}`}
+                      controls
+                      className="w-full aspect-video"
+                    />
+                  ) : null}
+                </div>
+              </div>
+            )}
+
             {/* Course Curriculum */}
             <div className="bg-white rounded-xl border border-gray-200 p-6">
               <h2 className="text-lg font-bold text-gray-900 mb-1">Course Curriculum</h2>
@@ -356,10 +396,17 @@ export default function ProgramDetailPage() {
                       </>
                     )}
                     <button
-                      onClick={() => setMainView("learn")}
+                      onClick={() => {
+                        setMainView("learn");
+                        // Give time for the learn view to mount, then scroll to certificate
+                        setTimeout(() => {
+                          const el = document.getElementById("certificate-section");
+                          if (el) el.scrollIntoView({ behavior: "smooth" });
+                        }, 300);
+                      }}
                       className="w-full py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold transition-all"
                     >
-                      {enrollment.status === "COMPLETED" ? "View Certificate" : "Continue Learning →"}
+                      {enrollment.status === "COMPLETED" ? "🎓 View Certificate" : "Continue Learning →"}
                     </button>
                   </div>
                 ) : (
@@ -431,7 +478,13 @@ export default function ProgramDetailPage() {
                 </button>
               ) : enrollment?.status === "COMPLETED" ? (
                 <button
-                  onClick={() => setLearnView("course")}
+                  onClick={() => {
+                    setLearnView("course");
+                    setTimeout(() => {
+                      const el = document.getElementById("certificate-section");
+                      if (el) el.scrollIntoView({ behavior: "smooth" });
+                    }, 200);
+                  }}
                   className="px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-sm transition-all"
                 >
                   🎓 View Certificate
@@ -663,15 +716,116 @@ export default function ProgramDetailPage() {
 
       {/* Certificate Banner */}
       {enrollment?.status === "COMPLETED" && (
-        <div className="mb-6 bg-gradient-to-r from-amber-500 to-orange-500 rounded-2xl p-6 text-white flex items-center gap-4">
-          <div className="text-4xl">🎓</div>
-          <div>
-            <h2 className="font-bold text-lg">Congratulations! You completed this program.</h2>
-            <p className="text-white/80 text-sm mt-0.5">
-              Certificate issued on {enrollment.certificateIssuedAt ? new Date(enrollment.certificateIssuedAt).toLocaleDateString() : ""}
-            </p>
+        <>
+          <div className="mb-6 bg-gradient-to-r from-amber-500 to-orange-500 rounded-2xl p-6 text-white flex items-center justify-between gap-4">
+            <div className="flex items-center gap-4">
+              <div className="text-4xl">🎓</div>
+              <div>
+                <h2 className="font-bold text-lg">Congratulations! You completed this program.</h2>
+                <p className="text-white/80 text-sm mt-0.5">
+                  Certificate issued on {enrollment.certificateIssuedAt ? new Date(enrollment.certificateIssuedAt).toLocaleDateString() : ""}
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => {
+                const el = document.getElementById("certificate-section");
+                if (el) el.scrollIntoView({ behavior: "smooth" });
+              }}
+              className="flex-shrink-0 px-5 py-2.5 rounded-xl bg-white text-amber-600 font-semibold text-sm hover:bg-amber-50 transition-colors shadow-md"
+            >
+              View Certificate
+            </button>
           </div>
-        </div>
+
+          {/* Certificate */}
+          <div id="certificate-section" className="mb-6">
+            <div className="bg-white rounded-2xl border border-amber-200 shadow-lg overflow-hidden">
+              <div className="px-6 py-4 bg-amber-50 border-b border-amber-100 flex items-center justify-between">
+                <h3 className="font-bold text-amber-800 flex items-center gap-2">
+                  <svg className="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"/>
+                  </svg>
+                  Certificate of Completion
+                </h3>
+                <button
+                  onClick={() => window.print()}
+                  className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-xs font-medium transition-colors"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/>
+                  </svg>
+                  Print / Save PDF
+                </button>
+              </div>
+
+              {/* Certificate body */}
+              <div
+                id="printable-certificate"
+                className="relative min-h-[420px] flex flex-col items-center justify-center p-10 text-center overflow-hidden"
+                style={{
+                  backgroundImage: program.certificateTemplatePath
+                    ? `url(${BASE_URL}${program.certificateTemplatePath})`
+                    : undefined,
+                  backgroundSize: "cover",
+                  backgroundPosition: "center",
+                  backgroundRepeat: "no-repeat",
+                }}
+              >
+                {/* Fallback decorative background when no template */}
+                {!program.certificateTemplatePath && (
+                  <div className="absolute inset-0 bg-gradient-to-br from-amber-50 via-yellow-50 to-orange-50">
+                    {/* Border decoration */}
+                    <div className="absolute inset-3 border-4 border-amber-300/40 rounded-2xl pointer-events-none" />
+                    <div className="absolute inset-5 border border-amber-200/30 rounded-xl pointer-events-none" />
+                  </div>
+                )}
+
+                {/* Semi-transparent overlay when template exists */}
+                {program.certificateTemplatePath && (
+                  <div className="absolute inset-0 bg-white/30" />
+                )}
+
+                <div className="relative z-10 space-y-4">
+                  {/* Seal */}
+                  <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-amber-100 border-4 border-amber-400 shadow-lg mb-2">
+                    <span className="text-3xl">🏆</span>
+                  </div>
+
+                  <div>
+                    <p className="text-sm font-medium text-amber-700 uppercase tracking-widest mb-1">This is to certify that</p>
+                    <h1 className="text-3xl md:text-4xl font-extrabold text-gray-900">
+                      {currentUser
+                        ? `${currentUser.firstName}${currentUser.middleName ? " " + currentUser.middleName : ""} ${currentUser.lastName}`
+                        : "Participant"
+                      }
+                    </h1>
+                  </div>
+
+                  <p className="text-gray-600 text-base">has successfully completed the course</p>
+
+                  <div>
+                    <h2 className="text-xl md:text-2xl font-bold text-blue-700">{program.name}</h2>
+                    {program.totalDuration && (
+                      <p className="text-sm text-gray-500 mt-1">{program.totalDuration} · by {program.author}</p>
+                    )}
+                  </div>
+
+                  <div className="pt-4">
+                    <div className="inline-block border-t-2 border-gray-400 pt-2">
+                      <p className="text-xs text-gray-500">Date of Completion</p>
+                      <p className="text-sm font-semibold text-gray-700">
+                        {enrollment.certificateIssuedAt
+                          ? new Date(enrollment.certificateIssuedAt).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" })
+                          : new Date().toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" })}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </>
       )}
 
       {/* Course list */}
@@ -752,17 +906,44 @@ export default function ProgramDetailPage() {
                   <div className="px-5 py-3 bg-gray-50 border-b border-gray-200">
                     <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Study Materials</h4>
                   </div>
-                  <div className="divide-y divide-gray-100">
-                    {activeCourse.materials.map((mat, mIdx) => (
-                      <a key={mIdx} href={`${BASE_URL}${mat.filePath}`} target="_blank" rel="noopener noreferrer"
-                        className="flex items-center gap-4 px-5 py-3.5 hover:bg-gray-50 transition-all">
-                        <span className="text-xl">📎</span>
-                        <div className="flex-1">
-                          <p className="text-sm text-gray-700">{mat.originalName}</p>
-                          <p className="text-xs text-gray-400">{(mat.fileSize / 1024 / 1024).toFixed(2)} MB</p>
-                        </div>
-                      </a>
-                    ))}
+                  <div
+                    className="divide-y divide-gray-100"
+                    onContextMenu={(e) => e.preventDefault()}
+                    style={{ userSelect: "none" } as React.CSSProperties}
+                  >
+                    {activeCourse.materials.map((mat, mIdx) => {
+                      const isPDF = mat.mimeType === "application/pdf";
+                      const isImage = mat.mimeType === "image/jpeg" || mat.mimeType === "image/png";
+                      const fileUrl = `${BASE_URL}${mat.filePath}`;
+                      return (
+                        <button
+                          key={mIdx}
+                          onClick={() => {
+                            if (isPDF) {
+                              // Open PDF with toolbar/navpanes hidden to block browser download button
+                              window.open(`${fileUrl}#toolbar=0&navpanes=0&scrollbar=0`, "_blank", "noopener");
+                            } else if (isImage) {
+                              window.open(fileUrl, "_blank", "noopener");
+                            }
+                          }}
+                          onContextMenu={(e) => e.preventDefault()}
+                          className="w-full flex items-center gap-4 px-5 py-3.5 hover:bg-gray-50 transition-all text-left"
+                          draggable={false}
+                        >
+                          <span className="text-xl flex-shrink-0">
+                            {isPDF ? "📄" : isImage ? "🖼️" : "📎"}
+                          </span>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm text-gray-700 truncate">{mat.originalName}</p>
+                            <p className="text-xs text-gray-400">{(mat.fileSize / 1024 / 1024).toFixed(2)} MB · {isPDF ? "PDF" : isImage ? "Image" : "File"}</p>
+                          </div>
+                          <svg className="w-4 h-4 text-gray-300 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                          </svg>
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
               )}

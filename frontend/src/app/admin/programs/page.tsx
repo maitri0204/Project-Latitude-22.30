@@ -155,6 +155,29 @@ export default function AdminProgramsPage() {
     }
   };
 
+  const handleMaterialUpload = async (e: React.ChangeEvent<HTMLInputElement>, callback: (url: string, file: any) => void) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const allowed = ["image/jpeg", "image/png", "application/pdf"];
+    if (!allowed.includes(file.type)) {
+      toast.error("Only JPEG, PNG and PDF files are allowed for course materials");
+      e.target.value = "";
+      return;
+    }
+    setUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await lmsAPI.uploadMaterial(fd);
+      callback(res.data.url, { originalName: file.name, fileName: res.data.filename, filePath: res.data.url, fileSize: file.size, mimeType: file.type });
+      toast.success("Material uploaded");
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || "Upload failed — only JPEG, PNG, PDF allowed");
+    } finally {
+      setUploading(false);
+    }
+  };
+
   // ─── Course management helpers ───
   const addCourse = () => {
     setFormData({
@@ -290,75 +313,119 @@ export default function AdminProgramsPage() {
             <p className="text-sm text-gray-500">Create your first program to get started</p>
           </div>
         ) : (
-          <div className="grid gap-4">
-            {programs.map((program) => (
-              <div key={program._id} className="bg-white rounded-xl shadow-sm p-5 border border-gray-200 hover:shadow-lg hover:shadow-blue-100/30 transition-all">
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-2">
-                      <h3 className="text-lg font-semibold text-gray-900">{program.name}</h3>
-                      <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium ${program.isPublished ? "bg-emerald-50 text-emerald-600" : "bg-amber-50 text-amber-600"}`}>
-                        {program.isPublished ? "Published" : "Draft"}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+            {programs.map((program) => {
+              const BASE_URL = process.env.NEXT_PUBLIC_API_URL?.replace("/api", "") || "http://localhost:5000";
+              const totalLessons = program.courses.reduce((sum: number, c: any) => sum + c.videos.length, 0);
+              const totalTests = program.courses.reduce((sum: number, c: any) => sum + c.tests.length, 0);
+              return (
+                <div key={program._id} className="bg-white rounded-2xl border border-gray-200 overflow-hidden hover:shadow-xl hover:shadow-blue-100/40 transition-all duration-300 flex flex-col group">
+                  {/* Thumbnail */}
+                  <div className="relative h-40 bg-gradient-to-br from-blue-600 to-indigo-700 overflow-hidden flex-shrink-0">
+                    {program.thumbnailPath ? (
+                      <img
+                        src={`${BASE_URL}${program.thumbnailPath}`}
+                        alt={program.name}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <span className="text-6xl font-black text-white/20">{program.name[0]}</span>
+                      </div>
+                    )}
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
+                    {/* Badges */}
+                    <div className="absolute top-2.5 left-2.5 flex items-center gap-1.5">
+                      <span className={`text-xs font-semibold px-2 py-0.5 rounded-full shadow-sm ${program.fees === 0 ? "bg-emerald-500 text-white" : "bg-amber-500 text-white"}`}>
+                        {program.fees === 0 ? "Free" : `₹${program.fees.toLocaleString()}`}
+                      </span>
+                      <span className={`text-xs font-semibold px-2 py-0.5 rounded-full shadow-sm ${program.isPublished ? "bg-blue-500 text-white" : "bg-gray-600 text-white"}`}>
+                        {program.isPublished ? "Live" : "Draft"}
                       </span>
                     </div>
-                    <p className="text-sm text-gray-500 line-clamp-2 mb-3">{program.brief}</p>
-                    <div className="flex items-center gap-4 text-xs text-gray-400">
-                      <span>👤 {program.author}</span>
-                      <span>⏱ {program.totalDuration}</span>
-                      <span>📚 {program.courses.length} courses</span>
-                      <span>💰 {program.fees > 0 ? `₹${program.fees}` : "Free"}</span>
+                  </div>
+
+                  {/* Card body */}
+                  <div className="flex flex-col flex-1 p-4">
+                    <h3 className="font-semibold text-gray-900 text-sm leading-snug line-clamp-2 mb-1.5">{program.name}</h3>
+                    <p className="text-xs text-gray-500 mb-3 line-clamp-2">{program.brief}</p>
+                    <div className="flex items-center gap-1 text-xs text-gray-400 mb-3">
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+                      <span className="truncate">{program.author}</span>
+                    </div>
+                    <div className="flex items-center gap-3 text-xs text-gray-400 mb-4 flex-wrap">
+                      <span className="flex items-center gap-1">
+                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
+                        {program.courses.length} modules
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                        {totalLessons} lessons
+                      </span>
+                      {totalTests > 0 && (
+                        <span className="flex items-center gap-1">
+                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                          {totalTests} quizzes
+                        </span>
+                      )}
+                      <span className="flex items-center gap-1">
+                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                        {program.totalDuration}
+                      </span>
+                    </div>
+
+                    {/* Actions */}
+                    <div className="mt-auto pt-3 border-t border-gray-100 flex items-center gap-1.5">
+                      <button
+                        onClick={() => handleDetail(program)}
+                        className="flex-1 py-1.5 rounded-lg border border-gray-200 text-gray-600 text-xs font-medium hover:bg-gray-50 transition-colors flex items-center justify-center gap-1"
+                        title="View Details"
+                      >
+                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                        </svg>
+                        View
+                      </button>
+                      <button
+                        onClick={() => handleEdit(program)}
+                        className="flex-1 py-1.5 rounded-lg border border-blue-200 text-blue-600 text-xs font-medium hover:bg-blue-50 transition-colors flex items-center justify-center gap-1"
+                        title="Edit"
+                      >
+                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                        </svg>
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => handleTogglePublish(program._id)}
+                        className={`p-1.5 rounded-lg transition-colors ${program.isPublished ? "hover:bg-amber-50 text-amber-500 border border-amber-200" : "hover:bg-emerald-50 text-emerald-500 border border-emerald-200"}`}
+                        title={program.isPublished ? "Unpublish" : "Publish"}
+                      >
+                        {program.isPublished ? (
+                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+                          </svg>
+                        ) : (
+                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                          </svg>
+                        )}
+                      </button>
+                      <button
+                        onClick={() => handleDelete(program._id)}
+                        className="p-1.5 rounded-lg hover:bg-red-50 text-red-400 border border-red-100 transition-colors"
+                        title="Delete"
+                      >
+                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                      </button>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2 ml-4">
-                    <button
-                      onClick={() => handleDetail(program)}
-                      className="p-2 rounded-lg hover:bg-gray-50 text-gray-500 transition-colors"
-                      title="View Details"
-                    >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                      </svg>
-                    </button>
-                    <button
-                      onClick={() => handleEdit(program)}
-                      className="p-2 rounded-lg hover:bg-gray-50 text-gray-500 transition-colors"
-                      title="Edit"
-                    >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                      </svg>
-                    </button>
-                    <button
-                      onClick={() => handleTogglePublish(program._id)}
-                      className={`p-2 rounded-lg transition-colors ${program.isPublished ? "hover:bg-amber-50 text-amber-500" : "hover:bg-emerald-50 text-emerald-500"}`}
-                      title={program.isPublished ? "Unpublish" : "Publish"}
-                    >
-                      {program.isPublished ? (
-                        // Unpublish: x-circle icon
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
-                        </svg>
-                      ) : (
-                        // Publish: cloud-upload icon
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                        </svg>
-                      )}
-                    </button>
-                    <button
-                      onClick={() => handleDelete(program._id)}
-                      className="p-2 rounded-lg hover:bg-red-50 text-red-400 transition-colors"
-                      title="Delete"
-                    >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                      </svg>
-                    </button>
-                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
@@ -721,8 +788,9 @@ export default function AdminProgramsPage() {
                     <input
                       type="file"
                       className="hidden"
+                      accept="image/jpeg,image/png,application/pdf"
                       onChange={(e) =>
-                        handleFileUpload(e, (url, fileInfo) => {
+                        handleMaterialUpload(e, (url, fileInfo) => {
                           const courses = [...formData.courses];
                           courses[cIdx].materials.push({
                             ...fileInfo,

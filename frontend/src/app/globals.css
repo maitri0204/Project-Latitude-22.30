@@ -200,3 +200,20 @@ html { scroll-behavior: smooth; }
   top: 0; left: 0;
   width: 100%; height: 100%;
 }
+
+/* ─── Print — show only certificate ─── */
+@media print {
+  body > * { display: none !important; }
+  #printable-certificate,
+  #printable-certificate * { display: block !important; visibility: visible !important; }
+  #printable-certificate {
+    position: fixed;
+    inset: 0;
+    width: 100vw;
+    height: 100vh;
+    margin: 0;
+    padding: 40px;
+    background: white !important;
+    z-index: 9999;
+  }
+}

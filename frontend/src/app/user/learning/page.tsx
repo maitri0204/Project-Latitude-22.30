@@ -165,7 +165,7 @@ export default function LearningHubPage() {
           <p className="text-sm text-gray-500">Try adjusting your search or filter</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
           {filteredPrograms.map((program) => {
             const enrolled = isEnrolled(program._id);
             const enrollment = getEnrollment(program._id);
@@ -261,32 +261,34 @@ export default function LearningHubPage() {
                   <div className="flex-1" />
 
                   <div className="flex gap-2 mt-3" onClick={(e) => e.stopPropagation()}>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); router.push(`/user/learning/${program._id}`); }}
-                      className="flex-1 py-2 rounded-lg border border-blue-600 text-blue-600 text-xs font-semibold hover:bg-blue-50 transition-all"
-                    >
-                      View Details
-                    </button>
                     {enrolled ? (
                       <button
                         onClick={(e) => { e.stopPropagation(); router.push(`/user/learning/${program._id}?view=learn`); }}
-                        className={`flex-1 py-2 rounded-lg text-xs font-semibold transition-all ${enrollment?.status === "COMPLETED" ? "bg-emerald-600 hover:bg-emerald-700 text-white" : "bg-blue-600 hover:bg-blue-700 text-white"}`}
+                        className={`w-full py-2 rounded-lg text-xs font-semibold transition-all ${enrollment?.status === "COMPLETED" ? "bg-emerald-600 hover:bg-emerald-700 text-white" : "bg-blue-600 hover:bg-blue-700 text-white"}`}
                       >
-                        {enrollment?.status === "COMPLETED" ? "Certificate" : "Continue"}
+                        {enrollment?.status === "COMPLETED" ? "🎓 View Certificate" : "Continue Learning →"}
                       </button>
                     ) : (
-                      <button
-                        onClick={(e) => handleEnroll(program._id, e)}
-                        disabled={enrolling === program._id}
-                        className="flex-1 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold transition-all disabled:opacity-60"
-                      >
-                        {enrolling === program._id ? (
-                          <span className="flex items-center justify-center gap-1">
-                            <span className="w-3 h-3 border-2 border-white/40 border-t-white rounded-full animate-spin inline-block" />
-                            Enrolling
-                          </span>
-                        ) : "Enroll Now"}
-                      </button>
+                      <>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); router.push(`/user/learning/${program._id}`); }}
+                          className="flex-1 py-2 rounded-lg border border-blue-600 text-blue-600 text-xs font-semibold hover:bg-blue-50 transition-all"
+                        >
+                          View Details
+                        </button>
+                        <button
+                          onClick={(e) => handleEnroll(program._id, e)}
+                          disabled={enrolling === program._id}
+                          className="flex-1 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold transition-all disabled:opacity-60"
+                        >
+                          {enrolling === program._id ? (
+                            <span className="flex items-center justify-center gap-1">
+                              <span className="w-3 h-3 border-2 border-white/40 border-t-white rounded-full animate-spin inline-block" />
+                              Enrolling
+                            </span>
+                          ) : "Enroll Now"}
+                        </button>
+                      </>
                     )}
                   </div>
                 </div>

@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { authenticate } from "../middleware/auth";
 import { authorize } from "../middleware/authorize";
-import { upload, handleMulterError } from "../middleware/upload";
+import { upload, materialUpload, handleMulterError } from "../middleware/upload";
 import { USER_ROLE } from "../types/roles";
 import {
   createProgram,
@@ -60,6 +60,15 @@ router.post(
   "/upload",
   authorize(USER_ROLE.ADMIN),
   upload.single("file"),
+  handleMulterError,
+  uploadFile
+);
+
+// Material upload — restricted to JPEG, PNG, PDF (admin only)
+router.post(
+  "/upload/material",
+  authorize(USER_ROLE.ADMIN),
+  materialUpload.single("file"),
   handleMulterError,
   uploadFile
 );

@@ -58,6 +58,29 @@ export const upload = multer({
   },
 });
 
+// ─── Material Upload (restricted to JPEG, PNG, PDF only) ───────────────────
+
+const materialFileFilter = (
+  req: Request,
+  file: Express.Multer.File,
+  cb: FileFilterCallback
+) => {
+  const allowedMimes = ["image/jpeg", "image/png", "application/pdf"];
+  if (allowedMimes.includes(file.mimetype)) {
+    cb(null, true);
+  } else {
+    cb(new Error("Only JPEG, PNG and PDF files are allowed for course materials"));
+  }
+};
+
+export const materialUpload = multer({
+  storage,
+  fileFilter: materialFileFilter,
+  limits: {
+    fileSize: 50 * 1024 * 1024, // 50MB
+  },
+});
+
 export const handleMulterError = (
   err: any,
   req: Request,
