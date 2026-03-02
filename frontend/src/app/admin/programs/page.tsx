@@ -30,10 +30,6 @@ export default function AdminProgramsPage() {
 
   const briefRef = useRef<HTMLTextAreaElement>(null);
   const [categories, setCategories] = useState<Category[]>([]);
-  const [showCategoryManager, setShowCategoryManager] = useState(false);
-  const [newCategoryName, setNewCategoryName] = useState("");
-  const [newSubCategoryName, setNewSubCategoryName] = useState("");
-  const [managingCategoryId, setManagingCategoryId] = useState<string | null>(null);
 
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -248,58 +244,6 @@ export default function AdminProgramsPage() {
     }
   };
 
-  // ─── Category management ───
-  const handleAddCategory = async () => {
-    if (!newCategoryName.trim()) return;
-    try {
-      await lmsAPI.createCategory({ name: newCategoryName.trim() });
-      toast.success("Category added");
-      setNewCategoryName("");
-      fetchCategories();
-    } catch (error: any) {
-      toast.error(error.response?.data?.message || "Failed to add category");
-    }
-  };
-
-  const handleAddSubCategory = async (categoryId: string) => {
-    if (!newSubCategoryName.trim()) return;
-    try {
-      await lmsAPI.addSubCategory(categoryId, { subCategory: newSubCategoryName.trim() });
-      toast.success("Sub-category added");
-      setNewSubCategoryName("");
-      fetchCategories();
-    } catch (error: any) {
-      toast.error(error.response?.data?.message || "Failed to add sub-category");
-    }
-  };
-
-  const handleDeleteCategory = async (categoryId: string) => {
-    if (!confirm("Delete this category and all its sub-categories?")) return;
-    try {
-      await lmsAPI.deleteCategory(categoryId);
-      toast.success("Category deleted");
-      if (formData.category === categories.find((c) => c._id === categoryId)?.name) {
-        setFormData({ ...formData, category: "", subCategory: "" });
-      }
-      fetchCategories();
-    } catch {
-      toast.error("Failed to delete category");
-    }
-  };
-
-  const handleDeleteSubCategory = async (categoryId: string, subCategory: string) => {
-    try {
-      await lmsAPI.deleteSubCategory(categoryId, subCategory);
-      toast.success("Sub-category removed");
-      if (formData.subCategory === subCategory) {
-        setFormData({ ...formData, subCategory: "" });
-      }
-      fetchCategories();
-    } catch {
-      toast.error("Failed to remove sub-category");
-    }
-  };
-
   // ─── Course management helpers ───
   const addCourse = () => {
     setFormData({
@@ -418,7 +362,7 @@ export default function AdminProgramsPage() {
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
             </svg>
-            Create Program
+            Add Program
           </button>
         </div>
 
@@ -662,8 +606,45 @@ export default function AdminProgramsPage() {
 
       <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-200">
         <h2 className="text-xl font-bold text-gray-900 mb-6">
-          {viewMode === "create" ? "Create New Program" : "Edit Program"}
+          {viewMode === "create" ? "Add New Program" : "Edit Program"}
         </h2>
+
+        {/* Category & Sub-category — top of form */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 p-4 bg-blue-50 rounded-lg border border-blue-100">
+          <div>
+            <label className="block text-base font-medium text-gray-700 mb-1">Category <span className="text-red-500">*</span></label>
+            <select
+              value={formData.category}
+              onChange={(e) => setFormData({ ...formData, category: e.target.value, subCategory: "" })}
+              className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 text-base outline-none bg-white"
+            >
+              <option value="">Select category...</option>
+              {categories.map((cat) => (
+                <option key={cat._id} value={cat.name}>{cat.name}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-base font-medium text-gray-700 mb-1">Sub-category <span className="text-gray-400 font-normal">(optional)</span></label>
+            <select
+              value={formData.subCategory}
+              onChange={(e) => setFormData({ ...formData, subCategory: e.target.value })}
+              className={`w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 text-base outline-none bg-white ${!formData.category ? "opacity-60 cursor-not-allowed" : ""}`}
+              disabled={!formData.category}
+            >
+              <option value="">
+                {!formData.category
+                  ? "Select a category first..."
+                  : selectedCategoryObj && selectedCategoryObj.subCategories.length === 0
+                  ? "No sub-categories available"
+                  : "Select sub-category (optional)..."}
+              </option>
+              {selectedCategoryObj?.subCategories.map((sub) => (
+                <option key={sub} value={sub}>{sub}</option>
+              ))}
+            </select>
+          </div>
+        </div>
 
         {/* Basic Info */}
         <div className="space-y-4 mb-8">
@@ -810,153 +791,6 @@ export default function AdminProgramsPage() {
                 }
               />
             </label>
-          </div>
-
-          {/* Category & Sub-category */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-base font-medium text-gray-700 mb-1">Category <span className="text-red-500">*</span></label>
-              <select
-                value={formData.category}
-                onChange={(e) => setFormData({ ...formData, category: e.target.value, subCategory: "" })}
-                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 text-base outline-none bg-white"
-              >
-                <option value="">Select category...</option>
-                {categories.map((cat) => (
-                  <option key={cat._id} value={cat.name}>{cat.name}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-base font-medium text-gray-700 mb-1">Sub-category <span className="text-gray-400 font-normal">(optional)</span></label>
-              <select
-                value={formData.subCategory}
-                onChange={(e) => setFormData({ ...formData, subCategory: e.target.value })}
-                className={`w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 text-base outline-none bg-white ${!formData.category ? "opacity-60 cursor-not-allowed" : ""}`}
-                disabled={!formData.category}
-              >
-                <option value="">
-                  {!formData.category
-                    ? "Select a category first..."
-                    : selectedCategoryObj && selectedCategoryObj.subCategories.length === 0
-                    ? "No sub-categories — add via Manage Categories"
-                    : "Select sub-category (optional)..."}
-                </option>
-                {selectedCategoryObj?.subCategories.map((sub) => (
-                  <option key={sub} value={sub}>{sub}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          {/* Manage Categories toggle */}
-          <div>
-            <button
-              type="button"
-              onClick={() => setShowCategoryManager(!showCategoryManager)}
-              className="text-sm text-blue-600 font-medium hover:underline flex items-center gap-1"
-            >
-              <svg className={`w-3.5 h-3.5 transition-transform ${showCategoryManager ? "rotate-90" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-              </svg>
-              Manage Categories
-            </button>
-
-            {showCategoryManager && (
-              <div className="mt-3 p-4 bg-gray-50 rounded-lg border border-gray-200">
-                {/* Add new category */}
-                <div className="flex gap-2 mb-4">
-                  <input
-                    type="text"
-                    value={newCategoryName}
-                    onChange={(e) => setNewCategoryName(e.target.value)}
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="New category name..."
-                    onKeyDown={(e) => e.key === "Enter" && handleAddCategory()}
-                  />
-                  <button
-                    type="button"
-                    onClick={handleAddCategory}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
-                  >
-                    Add Category
-                  </button>
-                </div>
-
-                {/* Category list */}
-                {categories.length === 0 ? (
-                  <p className="text-sm text-gray-400 text-center py-3">No categories yet. Add one above.</p>
-                ) : (
-                  <div className="space-y-3">
-                    {categories.map((cat) => (
-                      <div key={cat._id} className="bg-white rounded-lg p-3 border border-gray-200">
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="font-medium text-gray-900 text-sm">{cat.name}</span>
-                          <div className="flex items-center gap-2">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setManagingCategoryId(managingCategoryId === cat._id ? null : cat._id);
-                                setNewSubCategoryName("");
-                              }}
-                              className="text-xs text-blue-600 hover:underline"
-                            >
-                              {managingCategoryId === cat._id ? "Close" : "+ Sub-category"}
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleDeleteCategory(cat._id)}
-                              className="text-xs text-red-500 hover:underline"
-                            >
-                              Delete
-                            </button>
-                          </div>
-                        </div>
-
-                        {/* Sub-categories */}
-                        {cat.subCategories.length > 0 && (
-                          <div className="flex flex-wrap gap-1.5 mb-2">
-                            {cat.subCategories.map((sub) => (
-                              <span key={sub} className="inline-flex items-center gap-1 text-xs bg-gray-100 text-gray-700 px-2 py-0.5 rounded-full">
-                                {sub}
-                                <button
-                                  type="button"
-                                  onClick={() => handleDeleteSubCategory(cat._id, sub)}
-                                  className="text-red-400 hover:text-red-600 font-bold"
-                                >
-                                  ×
-                                </button>
-                              </span>
-                            ))}
-                          </div>
-                        )}
-
-                        {/* Add sub-category form */}
-                        {managingCategoryId === cat._id && (
-                          <div className="flex gap-2 mt-2">
-                            <input
-                              type="text"
-                              value={newSubCategoryName}
-                              onChange={(e) => setNewSubCategoryName(e.target.value)}
-                              className="flex-1 px-2.5 py-1.5 border border-gray-300 rounded-lg text-xs text-gray-900 outline-none focus:ring-2 focus:ring-blue-500"
-                              placeholder="Sub-category name..."
-                              onKeyDown={(e) => e.key === "Enter" && handleAddSubCategory(cat._id)}
-                            />
-                            <button
-                              type="button"
-                              onClick={() => handleAddSubCategory(cat._id)}
-                              className="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-medium hover:bg-blue-700"
-                            >
-                              Add
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
           </div>
 
           <div>
@@ -1217,7 +1051,7 @@ export default function AdminProgramsPage() {
             disabled={saving || uploading}
             className="px-8 py-3 rounded-lg bg-blue-600 text-white font-medium text-base hover:bg-blue-700 transition-all disabled:opacity-50"
           >
-            {saving ? "Saving..." : viewMode === "create" ? "Create Program" : "Save Changes"}
+            {saving ? "Saving..." : viewMode === "create" ? "Add Program" : "Save Changes"}
           </button>
           <button
             onClick={() => setViewMode("list")}
