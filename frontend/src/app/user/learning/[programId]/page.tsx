@@ -56,6 +56,9 @@ export default function ProgramDetailPage() {
   const [testResult, setTestResult] = useState<any>(null);
   const [submitting, setSubmitting] = useState(false);
   const [showPrevious, setShowPrevious] = useState(false);
+  const [previewMat, setPreviewMat] = useState<{ url: string; type: "pdf" | "image"; name: string } | null>(null);
+  const [previewBlobUrl, setPreviewBlobUrl] = useState<string | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
 
   const fetchData = useCallback(async () => {
     try {
@@ -85,6 +88,46 @@ export default function ProgramDetailPage() {
       }
     }
   }, []);
+
+  // Block right-click and keyboard shortcuts while material preview is open
+  useEffect(() => {
+    if (!previewMat) return;
+    const preventMenu = (e: MouseEvent) => e.preventDefault();
+    const preventKeys = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && ["s", "p", "c", "u", "a"].includes(e.key.toLowerCase())) {
+        e.preventDefault();
+      }
+    };
+    document.addEventListener("contextmenu", preventMenu);
+    document.addEventListener("keydown", preventKeys);
+    return () => {
+      document.removeEventListener("contextmenu", preventMenu);
+      document.removeEventListener("keydown", preventKeys);
+    };
+  }, [previewMat]);
+
+  // Fetch material as authenticated blob URL to avoid cross-origin iframe issues
+  useEffect(() => {
+    if (!previewMat) {
+      // Clean up previous blob URL
+      setPreviewBlobUrl((prev) => { if (prev) URL.revokeObjectURL(prev); return null; });
+      return;
+    }
+    let cancelled = false;
+    setPreviewLoading(true);
+    setPreviewBlobUrl(null);
+    const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+    fetch(previewMat.url, { headers: token ? { Authorization: `Bearer ${token}` } : {} })
+      .then((res) => res.blob())
+      .then((blob) => {
+        if (cancelled) return;
+        const blobUrl = URL.createObjectURL(blob);
+        setPreviewBlobUrl(blobUrl);
+      })
+      .catch(() => { if (!cancelled) toast.error("Failed to load material"); })
+      .finally(() => { if (!cancelled) setPreviewLoading(false); });
+    return () => { cancelled = true; };
+  }, [previewMat]);
 
   // ── Enrollment helpers ───────────────────────────────────────────────────
 
@@ -904,11 +947,8 @@ export default function ProgramDetailPage() {
                         <button
                           key={mIdx}
                           onClick={() => {
-                            if (isPDF) {
-                              // Open PDF with toolbar/navpanes hidden to block browser download button
-                              window.open(`${fileUrl}#toolbar=0&navpanes=0&scrollbar=0`, "_blank", "noopener");
-                            } else if (isImage) {
-                              window.open(fileUrl, "_blank", "noopener");
+                            if (isPDF || isImage) {
+                              setPreviewMat({ url: fileUrl, type: isPDF ? "pdf" : "image", name: mat.originalName });
                             }
                           }}
                           onContextMenu={(e) => e.preventDefault()}
@@ -1002,6 +1042,86 @@ export default function ProgramDetailPage() {
           )}
         </div>
       </div>
+
+      {/* ── Protected Material Preview Modal ── */}
+      {previewMat && (
+        <div
+          className="fixed inset-0 z-50 flex flex-col"
+          style={{ userSelect: "none", WebkitUserSelect: "none" } as React.CSSProperties}
+          onContextMenu={(e) => e.preventDefault()}
+        >
+          {/* Top bar */}
+          <div className="flex items-center justify-between px-5 py-3 bg-gray-900 flex-shrink-0">
+            <div className="flex items-center gap-3 min-w-0">
+              <span className="text-xl flex-shrink-0">{previewMat.type === "pdf" ? "📄" : "🖼️"}</span>
+              <span className="text-white font-medium text-sm truncate">{previewMat.name}</span>
+              <span className="text-xs text-gray-400 bg-gray-700 px-2 py-0.5 rounded flex-shrink-0">🔒 Protected</span>
+            </div>
+            <button
+              onClick={() => setPreviewMat(null)}
+              className="flex items-center gap-2 px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-white text-sm rounded-lg transition-colors flex-shrink-0 ml-4"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+              Close
+            </button>
+          </div>
+
+          {/* Content area */}
+          <div
+            className="flex-1 relative overflow-hidden bg-gray-950"
+            onContextMenu={(e) => e.preventDefault()}
+            onDragStart={(e) => e.preventDefault()}
+          >
+            {previewLoading || !previewBlobUrl ? (
+              <div className="w-full h-full flex flex-col items-center justify-center gap-3">
+                <div className="w-10 h-10 border-4 border-gray-600 border-t-blue-400 rounded-full animate-spin" />
+                <p className="text-gray-400 text-sm">Loading material...</p>
+              </div>
+            ) : previewMat.type === "pdf" ? (
+              <div className="relative w-full h-full">
+                <iframe
+                  src={`${previewBlobUrl}#toolbar=0&navpanes=0&scrollbar=0&view=FitH`}
+                  className="w-full h-full border-0"
+                  title={previewMat.name}
+                />
+                {/* Overlay with pointer-events: none allows scroll/pointer events through,
+                    while document-level handlers block right-click and copy globally */}
+                <div
+                  className="absolute inset-0 z-10"
+                  style={{ background: "transparent", pointerEvents: "none" }}
+                />
+              </div>
+            ) : (
+              <div
+                className="w-full h-full flex items-center justify-center"
+                onContextMenu={(e) => e.preventDefault()}
+                onDragStart={(e) => e.preventDefault()}
+              >
+                <div className="relative">
+                  <img
+                    src={previewBlobUrl}
+                    alt={previewMat.name}
+                    draggable={false}
+                    onDragStart={(e) => e.preventDefault()}
+                    onContextMenu={(e) => e.preventDefault()}
+                    className="max-w-[90vw] max-h-[85vh] object-contain rounded shadow-2xl"
+                    style={{ userSelect: "none", WebkitUserDrag: "none" } as React.CSSProperties}
+                  />
+                  {/* Transparent overlay prevents right-click & drag on the image */}
+                  <div
+                    className="absolute inset-0 z-10"
+                    onContextMenu={(e) => e.preventDefault()}
+                    onDragStart={(e) => e.preventDefault()}
+                    style={{ background: "transparent" }}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
