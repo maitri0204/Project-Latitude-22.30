@@ -215,16 +215,18 @@ export default function AdminProgramsPage() {
       const newBrief = text.substring(0, start) + formatted + text.substring(end);
       setFormData({ ...formData, brief: newBrief });
     } else {
+      // Find the start of the current line regardless of where the cursor is
+      const lineStart = text.lastIndexOf("\n", start - 1) + 1;
+
       let prefix: string;
       if (type === "bullet") {
         prefix = "• ";
       } else {
-        // Detect the last numbered item before the cursor to auto-increment
-        const textBefore = text.substring(0, start);
-        const lines = textBefore.split("\n");
+        // Scan lines before the current line to auto-increment
+        const prevLines = text.substring(0, lineStart).split("\n");
         let lastNum = 0;
-        for (let i = lines.length - 1; i >= 0; i--) {
-          const match = lines[i].match(/^(\d+)\.\s/);
+        for (let i = prevLines.length - 1; i >= 0; i--) {
+          const match = prevLines[i].match(/^(\d+)\.\s/);
           if (match) {
             lastNum = parseInt(match[1]);
             break;
@@ -232,13 +234,11 @@ export default function AdminProgramsPage() {
         }
         prefix = `${lastNum + 1}. `;
       }
-      const needsNewline = start > 0 && text[start - 1] !== "\n";
-      const insertion = (needsNewline ? "\n" : "") + prefix;
-      const newBrief = text.substring(0, start) + insertion + text.substring(end);
+      const newBrief = text.substring(0, lineStart) + prefix + text.substring(lineStart);
       setFormData({ ...formData, brief: newBrief });
       setTimeout(() => {
         ta.focus();
-        const pos = start + insertion.length;
+        const pos = lineStart + prefix.length;
         ta.setSelectionRange(pos, pos);
       }, 0);
     }
