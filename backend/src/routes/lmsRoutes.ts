@@ -19,6 +19,10 @@ import {
   completeCourse,
   submitTest,
   getProgramEnrollments,
+  getDashboardStats,
+  getWishlist,
+  addToWishlist,
+  removeFromWishlist,
 } from "../controllers/lmsController";
 import {
   getCategories,
@@ -107,6 +111,9 @@ router.get(
 router.get("/programs", getPrograms);
 router.get("/programs/:programId", getProgram);
 
+// ===== Admin dashboard =====
+router.get("/admin/dashboard", authorize(USER_ROLE.ADMIN), getDashboardStats);
+
 // ===== Category routes =====
 router.get("/categories", getCategories);
 router.post("/categories", authorize(USER_ROLE.ADMIN), createCategory);
@@ -144,5 +151,10 @@ router.post(
   authorize(USER_ROLE.USER),
   submitTest
 );
+
+// ===== User wishlist =====
+router.get("/wishlist", authorize(USER_ROLE.USER), getWishlist);
+router.post("/wishlist/:programId", authorize(USER_ROLE.USER), addToWishlist);
+router.delete("/wishlist/:programId", authorize(USER_ROLE.USER), removeFromWishlist);
 
 export default router;

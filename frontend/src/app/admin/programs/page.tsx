@@ -35,6 +35,25 @@ export default function AdminProgramsPage() {
 
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [collapsedCourses, setCollapsedCourses] = useState<Set<number>>(new Set());
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [selectedSubCategory, setSelectedSubCategory] = useState<string | null>(null);
+
+  const toggleCourseCollapse = (idx: number) => {
+    setCollapsedCourses(prev => {
+      const next = new Set(prev);
+      if (next.has(idx)) next.delete(idx); else next.add(idx);
+      return next;
+    });
+  };
+
+  const collapseAllCourses = () => {
+    setCollapsedCourses(new Set(formData.courses.map((_, i) => i)));
+  };
+
+  const expandAllCourses = () => {
+    setCollapsedCourses(new Set());
+  };
 
   const fetchPrograms = useCallback(async () => {
     try {
@@ -454,8 +473,83 @@ export default function AdminProgramsPage() {
             <p className="text-base text-gray-500">Create your first program to get started</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-            {programs.map((program) => {
+          <>
+            {/* Category / Sub-Category Browser (Udemy-style) */}
+            {categories.length > 0 && (
+              <div className="mb-6">
+                {/* Category row */}
+                <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+                  <button
+                    onClick={() => { setSelectedCategory(null); setSelectedSubCategory(null); }}
+                    className={`px-4 py-2 rounded-full text-sm font-semibold whitespace-nowrap transition-all ${
+                      !selectedCategory
+                        ? "bg-gray-900 text-white shadow"
+                        : "bg-white text-gray-700 border border-gray-200 hover:border-gray-400"
+                    }`}
+                  >
+                    All Categories
+                  </button>
+                  {categories.map((cat) => (
+                    <button
+                      key={cat._id}
+                      onClick={() => {
+                        setSelectedCategory(selectedCategory === cat.name ? null : cat.name);
+                        setSelectedSubCategory(null);
+                      }}
+                      className={`px-4 py-2 rounded-full text-sm font-semibold whitespace-nowrap transition-all ${
+                        selectedCategory === cat.name
+                          ? "bg-gray-900 text-white shadow"
+                          : "bg-white text-gray-700 border border-gray-200 hover:border-gray-400"
+                      }`}
+                    >
+                      {cat.name}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Sub-category row */}
+                {selectedCategory && (() => {
+                  const activeCat = categories.find((c) => c.name === selectedCategory);
+                  if (!activeCat || activeCat.subCategories.length === 0) return null;
+                  return (
+                    <div className="flex gap-2 overflow-x-auto mt-2 pb-1 scrollbar-hide">
+                      <button
+                        onClick={() => setSelectedSubCategory(null)}
+                        className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all ${
+                          !selectedSubCategory
+                            ? "bg-blue-600 text-white"
+                            : "bg-blue-50 text-blue-700 hover:bg-blue-100"
+                        }`}
+                      >
+                        All in {selectedCategory}
+                      </button>
+                      {activeCat.subCategories.map((sub) => (
+                        <button
+                          key={sub}
+                          onClick={() => setSelectedSubCategory(selectedSubCategory === sub ? null : sub)}
+                          className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all ${
+                            selectedSubCategory === sub
+                              ? "bg-blue-600 text-white"
+                              : "bg-blue-50 text-blue-700 hover:bg-blue-100"
+                          }`}
+                        >
+                          {sub}
+                        </button>
+                      ))}
+                    </div>
+                  );
+                })()}
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+            {programs
+              .filter((p) => {
+                const matchCat = !selectedCategory || p.category === selectedCategory;
+                const matchSub = !selectedSubCategory || p.subCategory === selectedSubCategory;
+                return matchCat && matchSub;
+              })
+              .map((program) => {
               const BASE_URL = process.env.NEXT_PUBLIC_API_URL?.replace("/api", "") || "http://localhost:5000";
               const totalLessons = program.courses.reduce((sum: number, c: any) => sum + c.videos.length, 0);
               const totalTests = program.courses.reduce((sum: number, c: any) => sum + c.tests.length, 0);
@@ -574,6 +668,7 @@ export default function AdminProgramsPage() {
               );
             })}
           </div>
+          </>
         )}
       </div>
     );
@@ -921,25 +1016,69 @@ export default function AdminProgramsPage() {
         <div className="mb-8">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-semibold text-gray-900">Courses / Chapters</h3>
-            <button
-              onClick={addCourse}
-              className="text-sm text-blue-600 font-medium hover:underline flex items-center gap-1"
-            >
-              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-              </svg>
-              Add Course / Chapter
-            </button>
+            <div className="flex items-center gap-3">
+              {formData.courses.length > 0 && (
+                <>
+                  <button
+                    type="button"
+                    onClick={collapseAllCourses}
+                    className="text-xs text-gray-500 hover:text-gray-700 font-medium"
+                  >
+                    Collapse All
+                  </button>
+                  <button
+                    type="button"
+                    onClick={expandAllCourses}
+                    className="text-xs text-gray-500 hover:text-gray-700 font-medium"
+                  >
+                    Expand All
+                  </button>
+                </>
+              )}
+              <button
+                onClick={addCourse}
+                className="text-sm text-blue-600 font-medium hover:underline flex items-center gap-1"
+              >
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                </svg>
+                Add Course / Chapter
+              </button>
+            </div>
           </div>
 
           {formData.courses.map((course, cIdx) => (
-            <div key={cIdx} className="bg-gray-50 rounded-lg p-5 mb-4">
-              <div className="flex items-center justify-between mb-3">
-                <h4 className="font-semibold text-gray-900 text-base">Course / Chapter {cIdx + 1}</h4>
-                <button onClick={() => removeCourse(cIdx)} className="text-red-400 hover:text-red-600 text-sm">
+            <div key={cIdx} className="bg-gray-50 rounded-lg mb-4 overflow-hidden">
+              <div
+                className="flex items-center justify-between p-5 pb-3 cursor-pointer select-none hover:bg-gray-100 transition-colors"
+                onClick={() => toggleCourseCollapse(cIdx)}
+              >
+                <div className="flex items-center gap-2">
+                  <svg
+                    className={`w-4 h-4 text-gray-400 transition-transform ${collapsedCourses.has(cIdx) ? "" : "rotate-90"}`}
+                    fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                  <h4 className="font-semibold text-gray-900 text-base">
+                    Chapter {cIdx + 1}{course.title ? `: ${course.title}` : ""}
+                  </h4>
+                  {collapsedCourses.has(cIdx) && (
+                    <span className="text-xs text-gray-400 ml-2">
+                      {course.videos.length} videos · {course.tests.length} tests · {course.materials?.length || 0} materials
+                    </span>
+                  )}
+                </div>
+                <button
+                  onClick={(e) => { e.stopPropagation(); removeCourse(cIdx); }}
+                  className="text-red-400 hover:text-red-600 text-sm"
+                >
                   Remove
                 </button>
               </div>
+
+              {!collapsedCourses.has(cIdx) && (
+              <div className="px-5 pb-5">
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
                 <input
@@ -1155,6 +1294,9 @@ export default function AdminProgramsPage() {
                   </div>
                 ))}
               </div>
+
+              </div>
+              )}
             </div>
           ))}
         </div>

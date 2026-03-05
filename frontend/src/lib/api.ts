@@ -127,6 +127,20 @@ export const lmsAPI = {
 
   deleteSubCategory: (id: string, subCategory: string) =>
     api.delete(`/lms/categories/${id}/sub/${encodeURIComponent(subCategory)}`),
+
+  // Admin dashboard
+  getDashboardStats: () =>
+    api.get("/lms/admin/dashboard"),
+
+  // Wishlist
+  getWishlist: () =>
+    api.get("/lms/wishlist"),
+
+  addToWishlist: (programId: string) =>
+    api.post(`/lms/wishlist/${programId}`),
+
+  removeFromWishlist: (programId: string) =>
+    api.delete(`/lms/wishlist/${programId}`),
 };
 
 export default api;

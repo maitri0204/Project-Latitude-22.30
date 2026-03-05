@@ -217,3 +217,12 @@ html { scroll-behavior: smooth; }
     z-index: 9999;
   }
 }
+
+/* Hide scrollbars on category browser */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}

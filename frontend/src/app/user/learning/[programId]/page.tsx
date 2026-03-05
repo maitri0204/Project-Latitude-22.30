@@ -35,6 +35,7 @@ export default function ProgramDetailPage() {
   const [loading, setLoading] = useState(true);
   const [enrolling, setEnrolling] = useState(false);
   const [currentUser, setCurrentUser] = useState<{ firstName: string; middleName?: string; lastName: string } | null>(null);
+  const [inWishlist, setInWishlist] = useState(false);
 
   // "details" = landing/info page | "learn" = actual learning view
   const [mainView, setMainView] = useState<"details" | "learn">(
@@ -69,6 +70,15 @@ export default function ProgramDetailPage() {
       ]);
       setProgram(programRes.data.program);
       if (enrollmentRes) setEnrollment(enrollmentRes.data.enrollment);
+      // Check wishlist
+      try {
+        const wlRes = await lmsAPI.getWishlist();
+        const inList = wlRes.data.wishlist.some((w: any) => {
+          const id = typeof w.programId === "string" ? w.programId : w.programId?._id;
+          return id === programId;
+        });
+        setInWishlist(inList);
+      } catch {}
     } catch {
       toast.error("Failed to load program");
       router.push("/user/learning");
@@ -89,69 +99,7 @@ export default function ProgramDetailPage() {
     }
   }, []);
 
-  // ─── Block DevTools / Console ─────────────────────────────────────────────
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-
-    // Block keyboard shortcuts that open DevTools
-    const blockKeys = (e: KeyboardEvent) => {
-      const key = e.key;
-      const ctrl = e.ctrlKey || e.metaKey;
-      const shift = e.shiftKey;
-      // F12
-      if (key === "F12") { e.preventDefault(); e.stopPropagation(); return false; }
-      // Ctrl/Cmd + Shift + I / J / C
-      if (ctrl && shift && (key === "I" || key === "i" || key === "J" || key === "j" || key === "C" || key === "c")) {
-        e.preventDefault(); e.stopPropagation(); return false;
-      }
-      // Ctrl/Cmd + U (view source)
-      if (ctrl && (key === "U" || key === "u")) {
-        e.preventDefault(); e.stopPropagation(); return false;
-      }
-    };
-
-    // Disable right-click context menu
-    const blockContext = (e: MouseEvent) => { e.preventDefault(); return false; };
-
-    // DevTools detection via debugger pause timing
-    let devtoolsInterval: ReturnType<typeof setInterval> | null = null;
-    const detectDevTools = () => {
-      const threshold = 160;
-      const widthThreshold = window.outerWidth - window.innerWidth > threshold;
-      const heightThreshold = window.outerHeight - window.innerHeight > threshold;
-      if (widthThreshold || heightThreshold) {
-        document.body.innerHTML = "";
-        window.location.replace("/user/learning");
-      }
-    };
-    devtoolsInterval = setInterval(detectDevTools, 1000);
-
-    // Disable debugger-bypassing via Function.prototype.toString override
-    const _desc = Object.getOwnPropertyDescriptor(window, "console");
-    try {
-      const handler: ProxyHandler<typeof console> = {
-        get(target, prop) {
-          if (prop === "clear") return () => {};
-          return (target as any)[prop];
-        },
-      };
-      const consoleProxy = new Proxy(console, handler);
-      Object.defineProperty(window, "console", { get: () => consoleProxy, configurable: true });
-    } catch {}
-
-    document.addEventListener("keydown", blockKeys, true);
-    document.addEventListener("contextmenu", blockContext, true);
-
-    return () => {
-      document.removeEventListener("keydown", blockKeys, true);
-      document.removeEventListener("contextmenu", blockContext, true);
-      if (devtoolsInterval) clearInterval(devtoolsInterval);
-      // Restore original console descriptor on unmount
-      if (_desc) { try { Object.defineProperty(window, "console", _desc); } catch {} }
-    };
-  }, []);
-
-  // Block right-click and keyboard shortcuts while material preview is open
+  // Block right-click, keyboard shortcuts, copy, cut, select, and print while material preview is open
   useEffect(() => {
     if (!previewMat) return;
     const preventMenu = (e: MouseEvent) => e.preventDefault();
@@ -159,12 +107,31 @@ export default function ProgramDetailPage() {
       if ((e.ctrlKey || e.metaKey) && ["s", "p", "c", "u", "a"].includes(e.key.toLowerCase())) {
         e.preventDefault();
       }
+      // Block PrintScreen
+      if (e.key === "PrintScreen") e.preventDefault();
     };
+    const preventCopy = (e: ClipboardEvent) => e.preventDefault();
+    const preventSelect = (e: Event) => e.preventDefault();
+    const preventPrint = (e: Event) => e.preventDefault();
     document.addEventListener("contextmenu", preventMenu);
     document.addEventListener("keydown", preventKeys);
+    document.addEventListener("copy", preventCopy);
+    document.addEventListener("cut", preventCopy);
+    document.addEventListener("selectstart", preventSelect);
+    window.addEventListener("beforeprint", preventPrint);
+    // Inject print-blocking style
+    const style = document.createElement("style");
+    style.id = "__pdf-preview-no-print";
+    style.textContent = `@media print { body * { display: none !important; } body::after { content: "Printing is disabled."; display: block; text-align: center; padding-top: 40vh; font-size: 24px; } }`;
+    document.head.appendChild(style);
     return () => {
       document.removeEventListener("contextmenu", preventMenu);
       document.removeEventListener("keydown", preventKeys);
+      document.removeEventListener("copy", preventCopy);
+      document.removeEventListener("cut", preventCopy);
+      document.removeEventListener("selectstart", preventSelect);
+      window.removeEventListener("beforeprint", preventPrint);
+      document.getElementById("__pdf-preview-no-print")?.remove();
     };
   }, [previewMat]);
 
@@ -230,6 +197,22 @@ export default function ProgramDetailPage() {
       toast.error(error.response?.data?.message || "Failed to enroll");
     } finally {
       setEnrolling(false);
+    }
+  };
+
+  const toggleWishlist = async () => {
+    try {
+      if (inWishlist) {
+        await lmsAPI.removeFromWishlist(programId);
+        setInWishlist(false);
+        toast.success("Removed from My List");
+      } else {
+        await lmsAPI.addToWishlist(programId);
+        setInWishlist(true);
+        toast.success("Added to My List ❤️");
+      }
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || "Failed");
     }
   };
 
@@ -527,13 +510,28 @@ export default function ProgramDetailPage() {
                     </button>
                   </div>
                 ) : (
-                  <button
-                    onClick={handleEnroll}
-                    disabled={enrolling}
-                    className="w-full py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold transition-all disabled:opacity-60"
-                  >
-                    {enrolling ? "Enrolling..." : program.fees === 0 ? "Enroll for Free" : "Buy & Enroll"}
-                  </button>
+                  <div className="space-y-2">
+                    <button
+                      onClick={handleEnroll}
+                      disabled={enrolling}
+                      className="w-full py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold transition-all disabled:opacity-60"
+                    >
+                      {enrolling ? "Enrolling..." : program.fees === 0 ? "Enroll for Free" : "Buy & Enroll"}
+                    </button>
+                    <button
+                      onClick={toggleWishlist}
+                      className={`w-full py-2.5 rounded-xl border text-sm font-semibold transition-all flex items-center justify-center gap-2 ${
+                        inWishlist
+                          ? "border-red-200 text-red-500 bg-red-50 hover:bg-red-100"
+                          : "border-gray-200 text-gray-600 hover:border-red-200 hover:text-red-500"
+                      }`}
+                    >
+                      <svg className="w-4 h-4" fill={inWishlist ? "currentColor" : "none"} stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                      </svg>
+                      {inWishlist ? "In My List" : "Add to My List"}
+                    </button>
+                  </div>
                 )}
               </div>
             </div>
@@ -1183,12 +1181,23 @@ export default function ProgramDetailPage() {
                   src={`${previewBlobUrl}#toolbar=0&navpanes=0&scrollbar=0&view=FitH`}
                   className="w-full h-full border-0"
                   title={previewMat.name}
+                  sandbox="allow-same-origin allow-scripts"
                 />
-                {/* Overlay with pointer-events: none allows scroll/pointer events through,
-                    while document-level handlers block right-click and copy globally */}
+                {/* Interactive overlay blocks text selection & copy inside PDF;
+                    wheel events are forwarded to the iframe so scrolling still works */}
                 <div
-                  className="absolute inset-0 z-10"
-                  style={{ background: "transparent", pointerEvents: "none" }}
+                  className="absolute inset-0 z-10 cursor-default"
+                  style={{ background: "transparent" }}
+                  onContextMenu={(e) => e.preventDefault()}
+                  onMouseDown={(e) => e.preventDefault()}
+                  onCopy={(e) => e.preventDefault()}
+                  onWheel={(e) => {
+                    // Forward scroll events to the iframe beneath
+                    const iframe = e.currentTarget.previousElementSibling as HTMLIFrameElement | null;
+                    if (iframe?.contentWindow) {
+                      iframe.contentWindow.scrollBy({ top: e.deltaY, left: e.deltaX, behavior: "auto" });
+                    }
+                  }}
                 />
               </div>
             ) : (

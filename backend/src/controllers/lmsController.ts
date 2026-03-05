@@ -483,6 +483,20 @@ export const enrollInProgram = async (
       return;
     }
 
+    // ── Block enrollment if user has an incomplete program ──
+    const incompleteEnrollment = await LMSEnrollment.findOne({
+      userId: req.user._id,
+      status: { $in: ["ENROLLED", "IN_PROGRESS"] },
+    }).populate("programId", "name");
+
+    if (incompleteEnrollment) {
+      const progName = (incompleteEnrollment.programId as any)?.name || "another program";
+      res.status(400).json({
+        message: `Please complete "${progName}" before enrolling in a new program.`,
+      });
+      return;
+    }
+
     const enrollment = new LMSEnrollment({
       userId: req.user._id,
       programId,
@@ -754,6 +768,98 @@ export const getProgramEnrollments = async (
     res.status(200).json({ enrollments });
   } catch (error: any) {
     console.error("Get program enrollments error:", error);
+    res.status(500).json({ message: "Server error." });
+  }
+};
+
+// GET /api/lms/admin/dashboard - Admin gets all enrollment stats
+export const getDashboardStats = async (
+  req: AuthRequest,
+  res: Response
+): Promise<void> => {
+  try {
+    const enrollments = await LMSEnrollment.find()
+      .populate("userId", "firstName middleName lastName email")
+      .populate("programId", "name courses");
+
+    // Determine real status: ENROLLED but hasn't watched any video = "NOT_STARTED",
+    // ENROLLED and has at least completedCourses.length > 0 or status=IN_PROGRESS = "IN_PROGRESS"
+    const data = enrollments.map((e: any) => {
+      let displayStatus: "NOT_STARTED" | "IN_PROGRESS" | "COMPLETED" = "NOT_STARTED";
+      if (e.status === "COMPLETED") {
+        displayStatus = "COMPLETED";
+      } else if (e.status === "IN_PROGRESS" || e.completedCourses.length > 0 || e.completedTests.length > 0) {
+        displayStatus = "IN_PROGRESS";
+      }
+      return {
+        _id: e._id,
+        user: e.userId,
+        program: e.programId,
+        enrolledAt: e.enrolledAt,
+        status: displayStatus,
+        completedCourses: e.completedCourses.length,
+        totalCourses: e.programId?.courses?.length || 0,
+      };
+    });
+
+    const total = data.length;
+    const completed = data.filter((d: any) => d.status === "COMPLETED").length;
+    const inProgress = data.filter((d: any) => d.status === "IN_PROGRESS").length;
+    const notStarted = data.filter((d: any) => d.status === "NOT_STARTED").length;
+
+    res.status(200).json({ total, completed, inProgress, notStarted, enrollments: data });
+  } catch (error: any) {
+    console.error("Dashboard stats error:", error);
+    res.status(500).json({ message: "Server error." });
+  }
+};
+
+// GET /api/lms/wishlist - Get user's wishlist
+export const getWishlist = async (
+  req: AuthRequest,
+  res: Response
+): Promise<void> => {
+  try {
+    const { Wishlist } = await import("../models/LMSProgram");
+    const items = await Wishlist.find({ userId: req.user._id }).populate("programId");
+    res.status(200).json({ wishlist: items });
+  } catch (error: any) {
+    console.error("Get wishlist error:", error);
+    res.status(500).json({ message: "Server error." });
+  }
+};
+
+// POST /api/lms/wishlist/:programId - Add to wishlist
+export const addToWishlist = async (
+  req: AuthRequest,
+  res: Response
+): Promise<void> => {
+  try {
+    const { programId } = req.params;
+    const { Wishlist } = await import("../models/LMSProgram");
+    const exists = await Wishlist.findOne({ userId: req.user._id, programId });
+    if (exists) { res.status(400).json({ message: "Already in wishlist." }); return; }
+    const item = new Wishlist({ userId: req.user._id, programId });
+    await item.save();
+    res.status(201).json({ message: "Added to wishlist.", item });
+  } catch (error: any) {
+    console.error("Add to wishlist error:", error);
+    res.status(500).json({ message: "Server error." });
+  }
+};
+
+// DELETE /api/lms/wishlist/:programId - Remove from wishlist
+export const removeFromWishlist = async (
+  req: AuthRequest,
+  res: Response
+): Promise<void> => {
+  try {
+    const { programId } = req.params;
+    const { Wishlist } = await import("../models/LMSProgram");
+    await Wishlist.deleteOne({ userId: req.user._id, programId });
+    res.status(200).json({ message: "Removed from wishlist." });
+  } catch (error: any) {
+    console.error("Remove from wishlist error:", error);
     res.status(500).json({ message: "Server error." });
   }
 };

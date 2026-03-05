@@ -199,10 +199,22 @@ const LMSEnrollmentSchema = new Schema<ILMSEnrollment>(
 
 LMSEnrollmentSchema.index({ userId: 1, programId: 1 }, { unique: true });
 
+// ─── Wishlist ───
+const WishlistSchema = new Schema(
+  {
+    userId: { type: Schema.Types.ObjectId, ref: "User", required: true },
+    programId: { type: Schema.Types.ObjectId, ref: "LMSProgram", required: true },
+  },
+  { timestamps: true }
+);
+WishlistSchema.index({ userId: 1, programId: 1 }, { unique: true });
+
 const LMSProgram = mongoose.model<ILMSProgram>("LMSProgram", LMSProgramSchema);
 export const LMSEnrollment = mongoose.model<ILMSEnrollment>(
   "LMSEnrollment",
   LMSEnrollmentSchema
 );
+
+export const Wishlist = mongoose.models.Wishlist || mongoose.model("Wishlist", WishlistSchema);
 
 export default LMSProgram;

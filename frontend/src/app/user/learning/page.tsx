@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 import { lmsAPI } from "@/lib/api";
-import { LMSProgram, LMSEnrollment } from "@/types";
+import { LMSProgram, LMSEnrollment, WishlistItem, Category } from "@/types";
 
 const BASE_URL =
   process.env.NEXT_PUBLIC_API_URL?.replace("/api", "") || "http://localhost:5000";
@@ -13,20 +13,28 @@ export default function LearningHubPage() {
   const router = useRouter();
   const [programs, setPrograms] = useState<LMSProgram[]>([]);
   const [enrollments, setEnrollments] = useState<LMSEnrollment[]>([]);
+  const [wishlist, setWishlist] = useState<WishlistItem[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [enrolling, setEnrolling] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [category, setCategory] = useState<"all" | "enrolled" | "free" | "paid">("all");
+  const [statusFilter, setStatusFilter] = useState<"all" | "enrolled" | "free" | "paid">("all");
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [selectedSubCategory, setSelectedSubCategory] = useState<string | null>(null);
 
   const fetchData = useCallback(async () => {
     try {
       setLoading(true);
-      const [programsRes, enrollmentsRes] = await Promise.all([
+      const [programsRes, enrollmentsRes, wishlistRes, categoriesRes] = await Promise.all([
         lmsAPI.getPrograms(),
         lmsAPI.getEnrollments(),
+        lmsAPI.getWishlist(),
+        lmsAPI.getCategories(),
       ]);
       setPrograms(programsRes.data.programs);
       setEnrollments(enrollmentsRes.data.enrollments);
+      setWishlist(wishlistRes.data.wishlist);
+      setCategories(categoriesRes.data.categories);
     } catch {
       toast.error("Failed to load data");
     } finally {
@@ -46,6 +54,32 @@ export default function LearningHubPage() {
     );
 
   const isEnrolled = (programId: string) => !!getEnrollment(programId);
+
+  const isInWishlist = (programId: string) =>
+    wishlist.some((w) => {
+      const id = typeof w.programId === "string" ? w.programId : (w.programId as any)?._id;
+      return id === programId;
+    });
+
+  const toggleWishlist = async (programId: string, ev: React.MouseEvent) => {
+    ev.stopPropagation();
+    try {
+      if (isInWishlist(programId)) {
+        await lmsAPI.removeFromWishlist(programId);
+        setWishlist((prev) => prev.filter((w) => {
+          const id = typeof w.programId === "string" ? w.programId : (w.programId as any)?._id;
+          return id !== programId;
+        }));
+        toast.success("Removed from My List");
+      } else {
+        const res = await lmsAPI.addToWishlist(programId);
+        setWishlist((prev) => [...prev, res.data.item]);
+        toast.success("Added to My List ❤️");
+      }
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || "Failed");
+    }
+  };
 
   const handleEnroll = async (programId: string, ev: React.MouseEvent) => {
     ev.stopPropagation();
@@ -69,15 +103,17 @@ export default function LearningHubPage() {
       p.name.toLowerCase().includes(q) ||
       p.brief.toLowerCase().includes(q) ||
       p.author.toLowerCase().includes(q);
-    const matchCat =
-      category === "all"
+    const matchStatus =
+      statusFilter === "all"
         ? true
-        : category === "enrolled"
+        : statusFilter === "enrolled"
         ? isEnrolled(p._id)
-        : category === "free"
+        : statusFilter === "free"
         ? p.fees === 0
         : p.fees > 0;
-    return matchSearch && matchCat;
+    const matchCategory = !selectedCategory || p.category === selectedCategory;
+    const matchSubCategory = !selectedSubCategory || p.subCategory === selectedSubCategory;
+    return matchSearch && matchStatus && matchCategory && matchSubCategory;
   });
 
   const totalLessons = (program: LMSProgram) =>
@@ -137,14 +173,82 @@ export default function LearningHubPage() {
         <span><strong className="text-gray-900">{programs.filter(p => p.fees === 0).length}</strong> Free</span>
       </div>
 
-      {/* Category Tabs */}
+      {/* Category / Sub-Category Browser (Udemy-style) */}
+      {categories.length > 0 && (
+        <div className="mb-6">
+          {/* Category row */}
+          <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+            <button
+              onClick={() => { setSelectedCategory(null); setSelectedSubCategory(null); }}
+              className={`px-4 py-2 rounded-full text-sm font-semibold whitespace-nowrap transition-all ${
+                !selectedCategory
+                  ? "bg-gray-900 text-white shadow"
+                  : "bg-white text-gray-700 border border-gray-200 hover:border-gray-400"
+              }`}
+            >
+              All Categories
+            </button>
+            {categories.map((cat) => (
+              <button
+                key={cat._id}
+                onClick={() => {
+                  setSelectedCategory(selectedCategory === cat.name ? null : cat.name);
+                  setSelectedSubCategory(null);
+                }}
+                className={`px-4 py-2 rounded-full text-sm font-semibold whitespace-nowrap transition-all ${
+                  selectedCategory === cat.name
+                    ? "bg-gray-900 text-white shadow"
+                    : "bg-white text-gray-700 border border-gray-200 hover:border-gray-400"
+                }`}
+              >
+                {cat.name}
+              </button>
+            ))}
+          </div>
+
+          {/* Sub-category row */}
+          {selectedCategory && (() => {
+            const activeCat = categories.find((c) => c.name === selectedCategory);
+            if (!activeCat || activeCat.subCategories.length === 0) return null;
+            return (
+              <div className="flex gap-2 overflow-x-auto mt-2 pb-1 scrollbar-hide">
+                <button
+                  onClick={() => setSelectedSubCategory(null)}
+                  className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all ${
+                    !selectedSubCategory
+                      ? "bg-blue-600 text-white"
+                      : "bg-blue-50 text-blue-700 hover:bg-blue-100"
+                  }`}
+                >
+                  All in {selectedCategory}
+                </button>
+                {activeCat.subCategories.map((sub) => (
+                  <button
+                    key={sub}
+                    onClick={() => setSelectedSubCategory(selectedSubCategory === sub ? null : sub)}
+                    className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all ${
+                      selectedSubCategory === sub
+                        ? "bg-blue-600 text-white"
+                        : "bg-blue-50 text-blue-700 hover:bg-blue-100"
+                    }`}
+                  >
+                    {sub}
+                  </button>
+                ))}
+              </div>
+            );
+          })()}
+        </div>
+      )}
+
+      {/* Status Tabs */}
       <div className="flex gap-2 mb-6 flex-wrap">
         {(["all", "enrolled", "free", "paid"] as const).map((tab) => (
           <button
             key={tab}
-            onClick={() => setCategory(tab)}
+            onClick={() => setStatusFilter(tab)}
             className={`px-4 py-1.5 rounded-full text-base font-medium transition-all ${
-              category === tab
+              statusFilter === tab
                 ? "bg-blue-600 text-white shadow-sm"
                 : "bg-white text-gray-600 border border-gray-200 hover:border-blue-300 hover:text-blue-600"
             }`}
@@ -287,6 +391,19 @@ export default function LearningHubPage() {
                               Enrolling
                             </span>
                           ) : "Enroll Now"}
+                        </button>
+                        <button
+                          onClick={(e) => toggleWishlist(program._id, e)}
+                          className={`px-2.5 py-2.5 rounded-lg border text-sm transition-all flex-shrink-0 ${
+                            isInWishlist(program._id)
+                              ? "border-red-200 text-red-500 bg-red-50"
+                              : "border-gray-200 text-gray-400 hover:text-red-500 hover:border-red-200"
+                          }`}
+                          title={isInWishlist(program._id) ? "Remove from My List" : "Add to My List"}
+                        >
+                          <svg className="w-4 h-4" fill={isInWishlist(program._id) ? "currentColor" : "none"} stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                          </svg>
                         </button>
                       </>
                     )}

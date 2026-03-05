@@ -114,3 +114,20 @@ export interface LMSEnrollment {
   status: "ENROLLED" | "IN_PROGRESS" | "COMPLETED";
   certificateIssuedAt?: string;
 }
+
+export interface WishlistItem {
+  _id: string;
+  userId: string;
+  programId: string | LMSProgram;
+  createdAt: string;
+}
+
+export interface DashboardEnrollment {
+  _id: string;
+  user: { _id: string; firstName: string; middleName?: string; lastName: string; email: string };
+  program: { _id: string; name: string; courses: any[] };
+  enrolledAt: string;
+  status: "NOT_STARTED" | "IN_PROGRESS" | "COMPLETED";
+  completedCourses: number;
+  totalCourses: number;
+}
