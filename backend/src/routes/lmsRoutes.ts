@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { authenticate } from "../middleware/auth";
 import { authorize } from "../middleware/authorize";
-import { upload, materialUpload, handleMulterError } from "../middleware/upload";
+import { upload, materialUpload, videoUpload, handleMulterError } from "../middleware/upload";
 import { USER_ROLE } from "../types/roles";
 import {
   createProgram,
@@ -11,6 +11,8 @@ import {
   deleteProgram,
   togglePublish,
   uploadFile,
+  streamVideo,
+  streamSampleVideo,
   enrollInProgram,
   getEnrollments,
   getEnrollment,
@@ -78,6 +80,27 @@ router.post(
   materialUpload.single("file"),
   handleMulterError,
   uploadFile
+);
+
+// Video upload — restricted to video formats (admin only)
+router.post(
+  "/upload/video",
+  authorize(USER_ROLE.ADMIN),
+  videoUpload.single("file"),
+  handleMulterError,
+  uploadFile
+);
+
+// Authenticated video streaming proxy (no direct file access)
+router.get(
+  "/stream-video/:programId/:courseIdx/:videoIdx",
+  streamVideo
+);
+
+// Authenticated sample video streaming proxy
+router.get(
+  "/stream-sample-video/:programId",
+  streamSampleVideo
 );
 
 // ===== Shared routes =====

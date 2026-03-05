@@ -36,7 +36,13 @@ export interface LMSTest {
 export interface LMSVideo {
   _id?: string;
   title: string;
-  link: string;
+  link?: string;
+  filePath?: string;
+  oneDriveItemId?: string;
+  originalName?: string;
+  fileName?: string;
+  fileSize?: number;
+  mimeType?: string;
   order: number;
 }
 
@@ -68,6 +74,7 @@ export interface LMSProgram {
   totalDuration: string;
   sampleVideoUrl?: string;
   sampleVideoPath?: string;
+  sampleVideoOneDriveItemId?: string;
   thumbnailPath?: string;
   author: string;
   whatYouLearn: string[];

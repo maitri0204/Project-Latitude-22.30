@@ -22,6 +22,8 @@ export default function AdminProgramsPage() {
     whatYouLearn: [""],
     fees: 0,
     sampleVideoUrl: "",
+    sampleVideoOneDriveItemId: "",
+    sampleVideoOriginalName: "",
     thumbnailPath: "",
     category: "",
     subCategory: "",
@@ -69,6 +71,8 @@ export default function AdminProgramsPage() {
       whatYouLearn: [""],
       fees: 0,
       sampleVideoUrl: "",
+      sampleVideoOneDriveItemId: "",
+      sampleVideoOriginalName: "",
       thumbnailPath: "",
       category: "",
       subCategory: "",
@@ -91,6 +95,8 @@ export default function AdminProgramsPage() {
       whatYouLearn: program.whatYouLearn.length > 0 ? program.whatYouLearn : [""],
       fees: program.fees,
       sampleVideoUrl: program.sampleVideoUrl || "",
+      sampleVideoOneDriveItemId: (program as any).sampleVideoOneDriveItemId || "",
+      sampleVideoOriginalName: "",
       thumbnailPath: (program as any).thumbnailPath || "",
       category: program.category || "",
       subCategory: program.subCategory || "",
@@ -194,6 +200,73 @@ export default function AdminProgramsPage() {
     }
   };
 
+  const handleSampleVideoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const allowed = ["video/mp4", "video/webm", "video/ogg", "video/quicktime", "video/x-msvideo"];
+    if (!allowed.includes(file.type)) {
+      toast.error("Only video files (MP4, WebM, OGG, MOV, AVI) are allowed");
+      e.target.value = "";
+      return;
+    }
+    setUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await lmsAPI.uploadVideo(fd);
+      setFormData(prev => ({
+        ...prev,
+        sampleVideoOneDriveItemId: res.data.oneDriveItemId || "",
+        sampleVideoUrl: "",
+        sampleVideoOriginalName: file.name,
+      }));
+      toast.success("Sample video uploaded to OneDrive ☁️");
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || "Sample video upload failed");
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleVideoUpload = async (e: React.ChangeEvent<HTMLInputElement>, courseIdx: number, videoIdx: number) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const allowed = ["video/mp4", "video/webm", "video/ogg", "video/quicktime", "video/x-msvideo"];
+    if (!allowed.includes(file.type)) {
+      toast.error("Only video files (MP4, WebM, OGG, MOV, AVI) are allowed");
+      e.target.value = "";
+      return;
+    }
+    setUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await lmsAPI.uploadVideo(fd);
+      const courses = [...formData.courses];
+      const vid = courses[courseIdx].videos[videoIdx];
+      if (res.data.oneDriveItemId) {
+        // Stored on OneDrive
+        vid.oneDriveItemId = res.data.oneDriveItemId;
+        vid.filePath = undefined;
+      } else {
+        // Fallback: stored locally
+        vid.filePath = res.data.url;
+        vid.oneDriveItemId = undefined;
+      }
+      vid.originalName = file.name;
+      vid.fileName = res.data.filename;
+      vid.fileSize = file.size;
+      vid.mimeType = file.type;
+      vid.link = undefined;
+      setFormData({ ...formData, courses });
+      toast.success(res.data.oneDriveItemId ? "Video uploaded to OneDrive ☁️" : "Video uploaded");
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || "Video upload failed");
+    } finally {
+      setUploading(false);
+    }
+  };
+
   // ─── Brief text formatting helpers ───
   const insertBriefList = (type: "bullet" | "number") => {
     const ta = briefRef.current;
@@ -278,7 +351,7 @@ export default function AdminProgramsPage() {
   // Video helpers
   const addVideo = (courseIdx: number) => {
     const courses = [...formData.courses];
-    courses[courseIdx].videos.push({ title: "", link: "", order: courses[courseIdx].videos.length });
+    courses[courseIdx].videos.push({ title: "", order: courses[courseIdx].videos.length });
     setFormData({ ...formData, courses });
   };
 
@@ -745,14 +818,31 @@ export default function AdminProgramsPage() {
               />
             </div>
             <div>
-              <label className="block text-base font-medium text-gray-700 mb-1">Sample Video URL</label>
-              <input
-                type="url"
-                value={formData.sampleVideoUrl}
-                onChange={(e) => setFormData({ ...formData, sampleVideoUrl: e.target.value })}
-                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 text-base outline-none"
-                placeholder="https://..."
-              />
+              <label className="block text-base font-medium text-gray-700 mb-1">Sample Video</label>
+              {(formData.sampleVideoOneDriveItemId || formData.sampleVideoUrl) ? (
+                <div className="flex items-center gap-2 px-3 py-2.5 bg-emerald-50 border border-emerald-200 rounded-lg">
+                  <svg className="w-4 h-4 text-emerald-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                  <span className="text-xs text-emerald-700 truncate flex-1">
+                    {formData.sampleVideoOriginalName || (formData.sampleVideoOneDriveItemId ? "Video on OneDrive" : "YouTube URL")}
+                  </span>
+                  {formData.sampleVideoOneDriveItemId && <span className="text-[10px] text-blue-500 flex-shrink-0">☁️</span>}
+                  <label className="text-xs text-blue-600 hover:underline cursor-pointer flex-shrink-0">
+                    Replace
+                    <input type="file" accept="video/mp4,video/webm,video/ogg,video/quicktime,video/x-msvideo" className="hidden" onChange={handleSampleVideoUpload} />
+                  </label>
+                  <button type="button" onClick={() => setFormData(prev => ({ ...prev, sampleVideoOneDriveItemId: "", sampleVideoUrl: "", sampleVideoOriginalName: "" }))} className="text-red-400 hover:text-red-600 text-lg leading-none flex-shrink-0">×</button>
+                </div>
+              ) : (
+                <label className="flex items-center gap-2 px-3 py-2.5 bg-blue-50 border border-blue-200 rounded-lg cursor-pointer hover:bg-blue-100 transition-colors w-fit">
+                  <svg className="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                  </svg>
+                  <span className="text-sm font-medium text-blue-600">{uploading ? "Uploading..." : "Upload Sample Video"}</span>
+                  <input type="file" accept="video/mp4,video/webm,video/ogg,video/quicktime,video/x-msvideo" className="hidden" onChange={handleSampleVideoUpload} disabled={uploading} />
+                </label>
+              )}
             </div>
           </div>
 
@@ -877,7 +967,7 @@ export default function AdminProgramsPage() {
                   </button>
                 </div>
                 {course.videos.map((vid, vIdx) => (
-                  <div key={vIdx} className="flex gap-2 mb-2">
+                  <div key={vIdx} className="flex items-center gap-2 mb-2">
                     <input
                       type="text"
                       value={vid.title}
@@ -885,13 +975,38 @@ export default function AdminProgramsPage() {
                       className="flex-1 px-3 py-1.5 rounded-lg border border-gray-300 text-sm text-gray-900"
                       placeholder="Video title"
                     />
-                    <input
-                      type="url"
-                      value={vid.link}
-                      onChange={(e) => updateVideo(cIdx, vIdx, "link", e.target.value)}
-                      className="flex-1 px-3 py-1.5 rounded-lg border border-gray-300 text-sm text-gray-900"
-                      placeholder="Video URL"
-                    />
+                    {(vid.filePath || vid.oneDriveItemId) ? (
+                      <div className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 border border-emerald-200 rounded-lg min-w-0">
+                        <svg className="w-4 h-4 text-emerald-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                        <span className="text-xs text-emerald-700 truncate max-w-[150px]">{vid.originalName || "Uploaded"}</span>
+                        {vid.oneDriveItemId && <span className="text-[10px] text-blue-500 flex-shrink-0">☁️</span>}
+                        <label className="text-xs text-blue-600 hover:underline cursor-pointer flex-shrink-0 ml-1">
+                          Replace
+                          <input
+                            type="file"
+                            accept="video/mp4,video/webm,video/ogg,video/quicktime,video/x-msvideo"
+                            className="hidden"
+                            onChange={(e) => handleVideoUpload(e, cIdx, vIdx)}
+                          />
+                        </label>
+                      </div>
+                    ) : (
+                      <label className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 border border-blue-200 rounded-lg cursor-pointer hover:bg-blue-100 transition-colors flex-shrink-0">
+                        <svg className="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                        </svg>
+                        <span className="text-xs font-medium text-blue-600">{uploading ? "Uploading..." : "Upload Video"}</span>
+                        <input
+                          type="file"
+                          accept="video/mp4,video/webm,video/ogg,video/quicktime,video/x-msvideo"
+                          className="hidden"
+                          onChange={(e) => handleVideoUpload(e, cIdx, vIdx)}
+                          disabled={uploading}
+                        />
+                      </label>
+                    )}
                     <button onClick={() => removeVideo(cIdx, vIdx)} className="text-red-400 text-sm px-2">
                       ×
                     </button>

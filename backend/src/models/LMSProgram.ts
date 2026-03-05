@@ -21,7 +21,13 @@ export interface ILMSTest {
 export interface ILMSVideo {
   _id?: mongoose.Types.ObjectId;
   title: string;
-  link: string;
+  link?: string;
+  filePath?: string;
+  oneDriveItemId?: string;
+  originalName?: string;
+  fileName?: string;
+  fileSize?: number;
+  mimeType?: string;
   order: number;
 }
 
@@ -52,6 +58,7 @@ export interface ILMSProgram extends Document {
   totalDuration: string;
   sampleVideoUrl?: string;
   sampleVideoPath?: string;
+  sampleVideoOneDriveItemId?: string;
   thumbnailPath?: string;
   author: string;
   whatYouLearn: string[];
@@ -104,7 +111,13 @@ const LMSTestSchema = new Schema<ILMSTest>({
 
 const LMSVideoSchema = new Schema<ILMSVideo>({
   title: { type: String, required: true },
-  link: { type: String, required: true },
+  link: { type: String },
+  filePath: { type: String },
+  oneDriveItemId: { type: String },
+  originalName: { type: String },
+  fileName: { type: String },
+  fileSize: { type: Number },
+  mimeType: { type: String },
   order: { type: Number, default: 0 },
 });
 
@@ -134,6 +147,7 @@ const LMSProgramSchema = new Schema<ILMSProgram>(
     totalDuration: { type: String, required: true },
     sampleVideoUrl: { type: String },
     sampleVideoPath: { type: String },
+    sampleVideoOneDriveItemId: { type: String },
     thumbnailPath: { type: String },
     author: { type: String, required: true },
     whatYouLearn: [{ type: String }],

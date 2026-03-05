@@ -89,6 +89,68 @@ export default function ProgramDetailPage() {
     }
   }, []);
 
+  // ─── Block DevTools / Console ─────────────────────────────────────────────
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    // Block keyboard shortcuts that open DevTools
+    const blockKeys = (e: KeyboardEvent) => {
+      const key = e.key;
+      const ctrl = e.ctrlKey || e.metaKey;
+      const shift = e.shiftKey;
+      // F12
+      if (key === "F12") { e.preventDefault(); e.stopPropagation(); return false; }
+      // Ctrl/Cmd + Shift + I / J / C
+      if (ctrl && shift && (key === "I" || key === "i" || key === "J" || key === "j" || key === "C" || key === "c")) {
+        e.preventDefault(); e.stopPropagation(); return false;
+      }
+      // Ctrl/Cmd + U (view source)
+      if (ctrl && (key === "U" || key === "u")) {
+        e.preventDefault(); e.stopPropagation(); return false;
+      }
+    };
+
+    // Disable right-click context menu
+    const blockContext = (e: MouseEvent) => { e.preventDefault(); return false; };
+
+    // DevTools detection via debugger pause timing
+    let devtoolsInterval: ReturnType<typeof setInterval> | null = null;
+    const detectDevTools = () => {
+      const threshold = 160;
+      const widthThreshold = window.outerWidth - window.innerWidth > threshold;
+      const heightThreshold = window.outerHeight - window.innerHeight > threshold;
+      if (widthThreshold || heightThreshold) {
+        document.body.innerHTML = "";
+        window.location.replace("/user/learning");
+      }
+    };
+    devtoolsInterval = setInterval(detectDevTools, 1000);
+
+    // Disable debugger-bypassing via Function.prototype.toString override
+    const _desc = Object.getOwnPropertyDescriptor(window, "console");
+    try {
+      const handler: ProxyHandler<typeof console> = {
+        get(target, prop) {
+          if (prop === "clear") return () => {};
+          return (target as any)[prop];
+        },
+      };
+      const consoleProxy = new Proxy(console, handler);
+      Object.defineProperty(window, "console", { get: () => consoleProxy, configurable: true });
+    } catch {}
+
+    document.addEventListener("keydown", blockKeys, true);
+    document.addEventListener("contextmenu", blockContext, true);
+
+    return () => {
+      document.removeEventListener("keydown", blockKeys, true);
+      document.removeEventListener("contextmenu", blockContext, true);
+      if (devtoolsInterval) clearInterval(devtoolsInterval);
+      // Restore original console descriptor on unmount
+      if (_desc) { try { Object.defineProperty(window, "console", _desc); } catch {} }
+    };
+  }, []);
+
   // Block right-click and keyboard shortcuts while material preview is open
   useEffect(() => {
     if (!previewMat) return;
@@ -308,33 +370,45 @@ export default function ProgramDetailPage() {
             )}
 
             {/* Sample Video Preview */}
-            {(program.sampleVideoUrl || program.sampleVideoPath) && (
-              <div className="bg-white rounded-xl border border-gray-200 p-6">
-                <h2 className="text-lg font-bold text-gray-900 mb-1 flex items-center gap-2">
-                  <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-blue-100">
-                    <svg className="w-4 h-4 text-blue-600" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
-                  </span>
-                  Course Preview
-                </h2>
-                <p className="text-sm text-gray-500 mb-4">Watch a free preview of this course</p>
-                <div className="video-container rounded-xl overflow-hidden shadow-sm border border-gray-100">
-                  {program.sampleVideoUrl ? (
-                    <iframe
-                      src={getEmbedUrl(program.sampleVideoUrl)}
-                      title="Course Preview"
-                      allowFullScreen
-                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                    />
-                  ) : program.sampleVideoPath ? (
-                    <video
-                      src={`${BASE_URL}${program.sampleVideoPath}`}
-                      controls
-                      className="w-full aspect-video"
-                    />
-                  ) : null}
+            {((program as any).sampleVideoOneDriveItemId || program.sampleVideoPath || program.sampleVideoUrl) && (() => {
+              const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+              const hasUploadedSample = !!(( program as any).sampleVideoOneDriveItemId || program.sampleVideoPath);
+              const sampleStreamUrl = hasUploadedSample
+                ? `${BASE_URL}/api/lms/stream-sample-video/${program._id}${token ? `?token=${token}` : ""}`
+                : null;
+              return (
+                <div className="bg-white rounded-xl border border-gray-200 p-6">
+                  <h2 className="text-lg font-bold text-gray-900 mb-1 flex items-center gap-2">
+                    <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-blue-100">
+                      <svg className="w-4 h-4 text-blue-600" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                    </span>
+                    Course Preview
+                  </h2>
+                  <p className="text-sm text-gray-500 mb-4">Watch a free preview of this course</p>
+                  <div className="rounded-xl overflow-hidden shadow-sm border border-gray-100">
+                    {sampleStreamUrl ? (
+                      <video
+                        src={sampleStreamUrl}
+                        controls
+                        controlsList="nodownload noplaybackrate"
+                        disablePictureInPicture
+                        onContextMenu={(e) => e.preventDefault()}
+                        className="w-full aspect-video bg-black"
+                      />
+                    ) : program.sampleVideoUrl ? (
+                      <div className="video-container">
+                        <iframe
+                          src={getEmbedUrl(program.sampleVideoUrl)}
+                          title="Course Preview"
+                          allowFullScreen
+                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                        />
+                      </div>
+                    ) : null}
+                  </div>
                 </div>
-              </div>
-            )}
+              );
+            })()}
 
             {/* Course Curriculum */}
             <div className="bg-white rounded-xl border border-gray-200 p-6">
@@ -690,6 +764,13 @@ export default function ProgramDetailPage() {
 
   // ─── VIDEO VIEW ──────────────────────────────────────────────────────────
   if (learnView === "video" && activeVideo) {
+    const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+    // Stream proxy is used for both OneDrive-stored and locally-stored videos
+    const isUploadedVideo = !!(activeVideo.oneDriveItemId || activeVideo.filePath);
+    const streamUrl = isUploadedVideo
+      ? `${BASE_URL}/api/lms/stream-video/${programId}/${activeCourseIdx}/${activeVideoIdx}${token ? `?token=${token}` : ""}`
+      : null;
+
     return (
       <div className="animate-fade-in">
         <button onClick={() => setLearnView("course")} className="flex items-center gap-2 text-sm text-gray-500 hover:text-blue-600 mb-4">
@@ -699,9 +780,26 @@ export default function ProgramDetailPage() {
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-5">
           <div className="lg:col-span-3">
             <div className="bg-black rounded-2xl overflow-hidden shadow-lg">
-              <div className="video-container">
-                <iframe src={getEmbedUrl(activeVideo.link)} title={activeVideo.title} allowFullScreen allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" />
-              </div>
+              {streamUrl ? (
+                <video
+                  key={`${activeCourseIdx}-${activeVideoIdx}`}
+                  src={streamUrl}
+                  controls
+                  autoPlay
+                  controlsList="nodownload noplaybackrate"
+                  disablePictureInPicture
+                  onContextMenu={(e) => e.preventDefault()}
+                  className="w-full aspect-video"
+                />
+              ) : activeVideo.link ? (
+                <div className="video-container">
+                  <iframe src={getEmbedUrl(activeVideo.link)} title={activeVideo.title} allowFullScreen allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" />
+                </div>
+              ) : (
+                <div className="flex items-center justify-center aspect-video text-gray-400">
+                  <p>No video available</p>
+                </div>
+              )}
             </div>
             <div className="bg-white rounded-xl border border-gray-200 mt-4 p-5">
               <h2 className="font-semibold text-gray-900">{activeVideo.title}</h2>

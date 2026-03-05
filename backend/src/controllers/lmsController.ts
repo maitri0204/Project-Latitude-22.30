@@ -5,6 +5,8 @@ import { AuthRequest } from "../middleware/auth";
 import { USER_ROLE } from "../types/roles";
 import path from "path";
 import fs from "fs";
+import axios from "axios";
+import { uploadToOneDrive, getOneDriveItemInfo } from "../utils/onedrive";
 
 // ===================== ADMIN (manages programs) =====================
 
@@ -241,6 +243,39 @@ export const uploadFile = async (
     const relativePath = path.relative(process.cwd(), req.file.path);
     const fileUrl = `/${relativePath.replace(/\\/g, "/")}`;
 
+    // Video files → upload to OneDrive only (no local copy kept)
+    if (req.file.mimetype.startsWith("video/")) {
+      let oneDriveItemId: string;
+      try {
+        oneDriveItemId = await uploadToOneDrive(
+          req.file.path,
+          req.file.filename
+        );
+      } catch (odErr: any) {
+        // Delete the temp file so disk space isn't wasted
+        fs.unlink(req.file.path, () => {});
+        console.error("OneDrive upload failed:", odErr.message);
+        res.status(502).json({
+          message: `OneDrive upload failed: ${odErr.message}. Please try again.`,
+        });
+        return;
+      }
+      // Delete local temp file after successful OneDrive upload
+      fs.unlink(req.file.path, (err) => {
+        if (err) console.warn("Could not delete temp video file:", err.message);
+      });
+      res.status(200).json({
+        message: "Video uploaded to OneDrive.",
+        oneDriveItemId,
+        filename: req.file.filename,
+        originalname: req.file.originalname,
+        size: req.file.size,
+        mimetype: req.file.mimetype,
+      });
+      return;
+    }
+
+    // Non-video files (thumbnails, materials, etc.) → local storage as before
     res.status(200).json({
       message: "File uploaded successfully.",
       url: fileUrl,
@@ -252,6 +287,168 @@ export const uploadFile = async (
   } catch (error: any) {
     console.error("Upload error:", error);
     res.status(500).json({ message: "Server error uploading file." });
+  }
+};
+
+// GET /api/lms/stream-sample-video/:programId - Authenticated sample video streaming proxy
+export const streamSampleVideo = async (
+  req: AuthRequest,
+  res: Response
+): Promise<void> => {
+  try {
+    const { programId } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(programId as string)) {
+      res.status(400).json({ message: "Invalid program ID." });
+      return;
+    }
+    const program = await LMSProgram.findById(programId);
+    if (!program) { res.status(404).json({ message: "Program not found." }); return; }
+
+    const range = req.headers.range;
+
+    // ── Stream from OneDrive (primary) ────────────────────────────────────
+    if (program.sampleVideoOneDriveItemId) {
+      const itemInfo = await getOneDriveItemInfo(program.sampleVideoOneDriveItemId);
+      const odResponse = await axios.get(itemInfo.downloadUrl, {
+        responseType: "stream",
+        headers: range ? { Range: range } : {},
+        validateStatus: (s) => s < 500,
+      });
+      res.writeHead(odResponse.status, {
+        "Content-Type": odResponse.headers["content-type"] || "video/mp4",
+        "Content-Length": odResponse.headers["content-length"] || "",
+        "Content-Range": odResponse.headers["content-range"] || "",
+        "Accept-Ranges": "bytes",
+        "Cache-Control": "no-store",
+      });
+      odResponse.data.pipe(res);
+      return;
+    }
+
+    // ── Fall back to local file ────────────────────────────────────────────
+    if (program.sampleVideoPath) {
+      const absPath = path.join(process.cwd(), program.sampleVideoPath);
+      if (!fs.existsSync(absPath)) { res.status(404).json({ message: "Sample video file missing." }); return; }
+      const stat = fs.statSync(absPath);
+      const fileSize = stat.size;
+      if (range) {
+        const parts = range.replace(/bytes=/, "").split("-");
+        const start = parseInt(parts[0], 10);
+        const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
+        res.writeHead(206, { "Content-Range": `bytes ${start}-${end}/${fileSize}`, "Accept-Ranges": "bytes", "Content-Length": end - start + 1, "Content-Type": "video/mp4", "Cache-Control": "no-store" });
+        fs.createReadStream(absPath, { start, end }).pipe(res);
+      } else {
+        res.writeHead(200, { "Content-Length": fileSize, "Content-Type": "video/mp4", "Cache-Control": "no-store" });
+        fs.createReadStream(absPath).pipe(res);
+      }
+      return;
+    }
+
+    res.status(404).json({ message: "No sample video found." });
+  } catch (error: any) {
+    console.error("Stream sample video error:", error);
+    res.status(500).json({ message: "Server error streaming sample video." });
+  }
+};
+
+// GET /api/lms/stream-video/:programId/:courseIdx/:videoIdx - Authenticated video streaming proxy
+export const streamVideo = async (
+  req: AuthRequest,
+  res: Response
+): Promise<void> => {
+  try {
+    const { programId, courseIdx, videoIdx } = req.params;
+    const cIdx = parseInt(courseIdx as string, 10);
+    const vIdx = parseInt(videoIdx as string, 10);
+
+    if (!mongoose.Types.ObjectId.isValid(programId as string)) {
+      res.status(400).json({ message: "Invalid program ID." });
+      return;
+    }
+
+    const program = await LMSProgram.findById(programId);
+    if (!program) {
+      res.status(404).json({ message: "Program not found." });
+      return;
+    }
+
+    // Users must be enrolled; admins who own it can also stream
+    if (req.user.role !== USER_ROLE.ADMIN || String(program.adminId) !== String(req.user._id)) {
+      const enrollment = await LMSEnrollment.findOne({ userId: req.user._id, programId });
+      if (!enrollment) {
+        res.status(403).json({ message: "Not enrolled in this program." });
+        return;
+      }
+    }
+
+    const course = program.courses[cIdx];
+    if (!course) { res.status(404).json({ message: "Course not found." }); return; }
+    const video = course.videos[vIdx];
+    if (!video || (!video.oneDriveItemId && !video.filePath)) {
+      res.status(404).json({ message: "Video not found." });
+      return;
+    }
+
+    const range = req.headers.range;
+
+    // ── Stream from OneDrive (primary) ────────────────────────────────────
+    if (video.oneDriveItemId) {
+      const itemInfo = await getOneDriveItemInfo(video.oneDriveItemId);
+
+      // Forward the request to OneDrive's pre-authenticated download URL,
+      // passing through the Range header so seeking works.
+      const odResponse = await axios.get(itemInfo.downloadUrl, {
+        responseType: "stream",
+        headers: range ? { Range: range } : {},
+        validateStatus: (s) => s < 500,
+      });
+
+      res.writeHead(odResponse.status, {
+        "Content-Type": odResponse.headers["content-type"] || video.mimeType || "video/mp4",
+        "Content-Length": odResponse.headers["content-length"] || "",
+        "Content-Range": odResponse.headers["content-range"] || "",
+        "Accept-Ranges": "bytes",
+        "Cache-Control": "no-store",
+      });
+      odResponse.data.pipe(res);
+      return;
+    }
+
+    // ── Fall back to local file (backward compat) ─────────────────────────
+    const absPath = path.join(process.cwd(), video.filePath!);
+    if (!fs.existsSync(absPath)) {
+      res.status(404).json({ message: "Video file missing from server." });
+      return;
+    }
+
+    const stat = fs.statSync(absPath);
+    const fileSize = stat.size;
+
+    if (range) {
+      const parts = range.replace(/bytes=/, "").split("-");
+      const start = parseInt(parts[0], 10);
+      const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
+      const chunksize = end - start + 1;
+      const stream = fs.createReadStream(absPath, { start, end });
+      res.writeHead(206, {
+        "Content-Range": `bytes ${start}-${end}/${fileSize}`,
+        "Accept-Ranges": "bytes",
+        "Content-Length": chunksize,
+        "Content-Type": video.mimeType || "video/mp4",
+        "Cache-Control": "no-store",
+      });
+      stream.pipe(res);
+    } else {
+      res.writeHead(200, {
+        "Content-Length": fileSize,
+        "Content-Type": video.mimeType || "video/mp4",
+        "Cache-Control": "no-store",
+      });
+      fs.createReadStream(absPath).pipe(res);
+    }
+  } catch (error: any) {
+    console.error("Stream video error:", error);
+    res.status(500).json({ message: "Server error streaming video." });
   }
 };
 

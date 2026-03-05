@@ -86,6 +86,12 @@ export const lmsAPI = {
       headers: { "Content-Type": "multipart/form-data" },
     }),
 
+  // Video upload — restricted to video formats
+  uploadVideo: (formData: FormData) =>
+    api.post("/lms/upload/video", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    }),
+
   // Enrollments
   enrollInProgram: (programId: string) =>
     api.post(`/lms/programs/${programId}/enroll`),

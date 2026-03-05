@@ -81,6 +81,29 @@ export const materialUpload = multer({
   },
 });
 
+// ─── Video Upload (restricted to video formats only) ───────────────────
+
+const videoFileFilter = (
+  req: Request,
+  file: Express.Multer.File,
+  cb: FileFilterCallback
+) => {
+  const allowedMimes = ["video/mp4", "video/webm", "video/ogg", "video/quicktime", "video/x-msvideo"];
+  if (allowedMimes.includes(file.mimetype)) {
+    cb(null, true);
+  } else {
+    cb(new Error("Only video files (MP4, WebM, OGG, MOV, AVI) are allowed"));
+  }
+};
+
+export const videoUpload = multer({
+  storage,
+  fileFilter: videoFileFilter,
+  limits: {
+    fileSize: 2 * 1024 * 1024 * 1024, // 2GB
+  },
+});
+
 export const handleMulterError = (
   err: any,
   req: Request,
