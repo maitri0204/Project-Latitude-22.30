@@ -741,6 +741,58 @@ export const submitTest = async (
   }
 };
 
+// POST /api/lms/enrollments/:programId/mark-complete
+// Used when a program has no tests — user manually declares completion
+export const markProgramComplete = async (
+  req: AuthRequest,
+  res: Response
+): Promise<void> => {
+  try {
+    const programId = req.params.programId as string;
+
+    const enrollment = await LMSEnrollment.findOne({ userId: req.user._id, programId });
+    if (!enrollment) {
+      res.status(404).json({ message: "Enrollment not found." });
+      return;
+    }
+
+    if (enrollment.status === "COMPLETED") {
+      res.status(400).json({ message: "Program is already completed." });
+      return;
+    }
+
+    const program = await LMSProgram.findById(programId);
+    if (!program) {
+      res.status(404).json({ message: "Program not found." });
+      return;
+    }
+
+    // Only allowed when the program has no tests at all
+    const hasTests = program.courses.some((c: any) => c.tests && c.tests.length > 0);
+    if (hasTests) {
+      res.status(400).json({ message: "This program has tests. Please complete all tests to finish the program." });
+      return;
+    }
+
+    // Mark all courses as completed
+    enrollment.completedCourses = program.courses.map((c: any) => c._id);
+    enrollment.status = "COMPLETED";
+    if (!enrollment.certificateIssuedAt) {
+      enrollment.certificateIssuedAt = new Date();
+    }
+
+    await enrollment.save();
+
+    res.status(200).json({
+      message: "🎉 Program marked as complete! Your certificate has been issued.",
+      enrollment,
+    });
+  } catch (error: any) {
+    console.error("Mark complete error:", error);
+    res.status(500).json({ message: "Server error." });
+  }
+};
+
 // GET /api/lms/programs/:programId/enrollments - Admin gets enrollment stats
 export const getProgramEnrollments = async (
   req: AuthRequest,

@@ -17,6 +17,7 @@ import {
   getEnrollments,
   getEnrollment,
   completeCourse,
+  markProgramComplete,
   submitTest,
   getProgramEnrollments,
   getDashboardStats,
@@ -144,6 +145,12 @@ router.post(
   "/enrollments/:programId/complete-course",
   authorize(USER_ROLE.USER),
   completeCourse
+);
+
+router.post(
+  "/enrollments/:programId/mark-complete",
+  authorize(USER_ROLE.USER),
+  markProgramComplete
 );
 
 router.post(

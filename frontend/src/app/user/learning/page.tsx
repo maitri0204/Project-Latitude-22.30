@@ -21,6 +21,7 @@ export default function LearningHubPage() {
   const [statusFilter, setStatusFilter] = useState<"all" | "enrolled" | "free" | "paid">("all");
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [selectedSubCategory, setSelectedSubCategory] = useState<string | null>(null);
+  const [hoveredCategory, setHoveredCategory] = useState<string | null>(null);
 
   const fetchData = useCallback(async () => {
     try {
@@ -173,71 +174,128 @@ export default function LearningHubPage() {
         <span><strong className="text-gray-900">{programs.filter(p => p.fees === 0).length}</strong> Free</span>
       </div>
 
-      {/* Category / Sub-Category Browser (Udemy-style) */}
+      {/* Udemy-style Category Navbar */}
       {categories.length > 0 && (
-        <div className="mb-6">
-          {/* Category row */}
-          <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
-            <button
-              onClick={() => { setSelectedCategory(null); setSelectedSubCategory(null); }}
-              className={`px-4 py-2 rounded-full text-sm font-semibold whitespace-nowrap transition-all ${
-                !selectedCategory
-                  ? "bg-gray-900 text-white shadow"
-                  : "bg-white text-gray-700 border border-gray-200 hover:border-gray-400"
-              }`}
-            >
-              All Categories
-            </button>
-            {categories.map((cat) => (
+        <div
+          className="mb-6 rounded-xl overflow-hidden border border-gray-200 shadow-md"
+          onMouseLeave={() => setHoveredCategory(null)}
+        >
+          {/* Category tab bar */}
+          <div className="bg-white overflow-x-auto scrollbar-hide border-b border-gray-200">
+            <div className="flex items-center min-w-max">
               <button
-                key={cat._id}
-                onClick={() => {
-                  setSelectedCategory(selectedCategory === cat.name ? null : cat.name);
-                  setSelectedSubCategory(null);
-                }}
-                className={`px-4 py-2 rounded-full text-sm font-semibold whitespace-nowrap transition-all ${
-                  selectedCategory === cat.name
-                    ? "bg-gray-900 text-white shadow"
-                    : "bg-white text-gray-700 border border-gray-200 hover:border-gray-400"
+                onClick={() => { setSelectedCategory(null); setSelectedSubCategory(null); }}
+                onMouseEnter={() => setHoveredCategory(null)}
+                className={`px-5 py-[14px] text-sm font-medium border-b-[3px] transition-colors whitespace-nowrap ${
+                  !selectedCategory
+                    ? "border-gray-900 text-gray-900"
+                    : "border-transparent text-gray-500 hover:text-gray-900"
                 }`}
               >
-                {cat.name}
+                All Courses
               </button>
-            ))}
-          </div>
-
-          {/* Sub-category row */}
-          {selectedCategory && (() => {
-            const activeCat = categories.find((c) => c.name === selectedCategory);
-            if (!activeCat || activeCat.subCategories.length === 0) return null;
-            return (
-              <div className="flex gap-2 overflow-x-auto mt-2 pb-1 scrollbar-hide">
-                <button
-                  onClick={() => setSelectedSubCategory(null)}
-                  className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all ${
-                    !selectedSubCategory
-                      ? "bg-blue-600 text-white"
-                      : "bg-blue-50 text-blue-700 hover:bg-blue-100"
-                  }`}
-                >
-                  All in {selectedCategory}
-                </button>
-                {activeCat.subCategories.map((sub) => (
+              {categories.map((cat) => {
+                const count = programs.filter((p) => p.category === cat.name).length;
+                if (count === 0) return null;
+                const isActive = selectedCategory === cat.name;
+                const isHovered = hoveredCategory === cat.name;
+                return (
                   <button
-                    key={sub}
-                    onClick={() => setSelectedSubCategory(selectedSubCategory === sub ? null : sub)}
-                    className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all ${
-                      selectedSubCategory === sub
-                        ? "bg-blue-600 text-white"
-                        : "bg-blue-50 text-blue-700 hover:bg-blue-100"
+                    key={cat._id}
+                    onMouseEnter={() => setHoveredCategory(cat.name)}
+                    onClick={() => {
+                      setSelectedCategory(isActive ? null : cat.name);
+                      setSelectedSubCategory(null);
+                      setHoveredCategory(null);
+                    }}
+                    className={`flex items-center gap-1 px-5 py-[14px] text-sm font-medium border-b-[3px] transition-colors whitespace-nowrap ${
+                      isActive
+                        ? "border-gray-900 text-gray-900"
+                        : isHovered
+                        ? "border-gray-400 text-gray-700"
+                        : "border-transparent text-gray-500 hover:text-gray-900"
                     }`}
                   >
-                    {sub}
+                    {cat.name}
+                    {cat.subCategories.length > 0 && (
+                      <svg
+                        className={`w-3 h-3 transition-transform duration-200 ${isHovered ? "rotate-180" : ""}`}
+                        fill="currentColor"
+                        viewBox="0 0 20 20"
+                      >
+                        <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+                      </svg>
+                    )}
                   </button>
-                ))}
+                );
+              })}
+              {(selectedCategory || selectedSubCategory) && (
+                <button
+                  onClick={() => { setSelectedCategory(null); setSelectedSubCategory(null); }}
+                  onMouseEnter={() => setHoveredCategory(null)}
+                  className="ml-auto px-5 py-[14px] text-xs text-blue-600 hover:text-blue-800 flex items-center gap-1.5 whitespace-nowrap border-b-[3px] border-transparent"
+                >
+                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                  Clear filter
+                </button>
+              )}
+            </div>
+          </div>
+          {/* Sub-category strip (appears on hover) */}
+          {hoveredCategory && (() => {
+            const hc = categories.find((c) => c.name === hoveredCategory);
+            if (!hc || hc.subCategories.length === 0) return null;
+            return (
+              <div className="bg-gray-50 border-t border-gray-200 px-5 py-3 flex items-center gap-2 flex-wrap">
+                <span className="text-[11px] font-bold text-gray-400 uppercase tracking-widest mr-1">{hoveredCategory}</span>
+                <span className="w-px h-4 bg-gray-300 mr-1 flex-shrink-0" />
+                {hc.subCategories.map((sub) => {
+                  const subCount = programs.filter((p) => p.category === hoveredCategory && p.subCategory === sub).length;
+                  const isActiveSub = selectedCategory === hoveredCategory && selectedSubCategory === sub;
+                  return (
+                    <button
+                      key={sub}
+                      onClick={() => {
+                        setSelectedCategory(hoveredCategory);
+                        setSelectedSubCategory(sub);
+                        setHoveredCategory(null);
+                      }}
+                      className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-sm text-sm font-medium transition-all ${
+                        isActiveSub
+                          ? "bg-gray-900 text-white shadow-sm"
+                          : "text-gray-700 hover:bg-gray-200 hover:text-gray-900"
+                      }`}
+                    >
+                      {sub}
+                      {subCount > 0 && (
+                        <span className="text-xs text-gray-500">({subCount})</span>
+                      )}
+                    </button>
+                  );
+                })}
               </div>
             );
           })()}
+          {/* Active filter breadcrumb */}
+          {selectedCategory && (
+            <div className="bg-blue-50 border-t border-gray-200 px-5 py-2 flex items-center gap-2">
+              <svg className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2a1 1 0 01-.293.707L13 13.414V19a1 1 0 01-.553.894l-4 2A1 1 0 017 21v-7.586L3.293 6.707A1 1 0 013 6V4z" />
+              </svg>
+              <span className="text-gray-500 text-xs">Filtering by:</span>
+              <span className="text-blue-600 font-semibold text-xs">{selectedCategory}</span>
+              {selectedSubCategory && (
+                <>
+                  <svg className="w-3 h-3 text-gray-400 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
+                  </svg>
+                  <span className="text-gray-900 font-semibold text-xs">{selectedSubCategory}</span>
+                </>
+              )}
+            </div>
+          )}
         </div>
       )}
 
@@ -247,7 +305,7 @@ export default function LearningHubPage() {
           <button
             key={tab}
             onClick={() => setStatusFilter(tab)}
-            className={`px-4 py-1.5 rounded-full text-base font-medium transition-all ${
+            className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all ${
               statusFilter === tab
                 ? "bg-blue-600 text-white shadow-sm"
                 : "bg-white text-gray-600 border border-gray-200 hover:border-blue-300 hover:text-blue-600"

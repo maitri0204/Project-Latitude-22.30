@@ -60,6 +60,7 @@ export default function ProgramDetailPage() {
   const [previewMat, setPreviewMat] = useState<{ url: string; type: "pdf" | "image"; name: string } | null>(null);
   const [previewBlobUrl, setPreviewBlobUrl] = useState<string | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
+  const [markingComplete, setMarkingComplete] = useState(false);
 
   const fetchData = useCallback(async () => {
     try {
@@ -159,6 +160,20 @@ export default function ProgramDetailPage() {
   }, [previewMat]);
 
   // ── Enrollment helpers ───────────────────────────────────────────────────
+
+  const handleMarkProgramComplete = async () => {
+    if (!program) return;
+    setMarkingComplete(true);
+    try {
+      const res = await lmsAPI.markProgramComplete(program._id);
+      setEnrollment(res.data.enrollment);
+      toast.success("🎓 Program completed! Your certificate is ready.");
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || "Failed to mark complete");
+    } finally {
+      setMarkingComplete(false);
+    }
+  };
 
   const isTestPassed = (testId?: string) =>
     testId ? (enrollment?.passedTests?.includes(testId) ?? false) : false;
@@ -1134,6 +1149,38 @@ export default function ProgramDetailPage() {
                   Next Chapter →
                 </button>
               )}
+
+              {/* Mark as Complete — shown on last chapter when the whole program has no tests */}
+              {enrollment &&
+                enrollment.status !== "COMPLETED" &&
+                activeCourseIdx === program.courses.length - 1 &&
+                program.courses.every((c) => c.tests.length === 0) && (
+                  <div className="mt-4 rounded-2xl bg-gradient-to-br from-emerald-50 to-green-50 border border-emerald-200 p-5 flex flex-col items-center gap-3 text-center">
+                    <div className="w-12 h-12 rounded-full bg-emerald-100 flex items-center justify-center">
+                      <svg className="w-6 h-6 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
+                      </svg>
+                    </div>
+                    <div>
+                      <p className="font-semibold text-gray-900 text-sm">You've reached the end!</p>
+                      <p className="text-xs text-gray-500 mt-0.5">Click below to complete the program and receive your certificate.</p>
+                    </div>
+                    <button
+                      onClick={handleMarkProgramComplete}
+                      disabled={markingComplete}
+                      className="w-full py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 text-white font-semibold text-sm transition-all shadow-lg shadow-emerald-200 disabled:opacity-60 flex items-center justify-center gap-2"
+                    >
+                      {markingComplete ? (
+                        <>
+                          <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                          Completing...
+                        </>
+                      ) : (
+                        <>🎓 Mark Program as Complete</>
+                      )}
+                    </button>
+                  </div>
+              )}
             </>
           )}
         </div>
@@ -1181,23 +1228,14 @@ export default function ProgramDetailPage() {
                   src={`${previewBlobUrl}#toolbar=0&navpanes=0&scrollbar=0&view=FitH`}
                   className="w-full h-full border-0"
                   title={previewMat.name}
-                  sandbox="allow-same-origin allow-scripts"
                 />
-                {/* Interactive overlay blocks text selection & copy inside PDF;
-                    wheel events are forwarded to the iframe so scrolling still works */}
+                {/* Interactive overlay blocks text selection & copy inside PDF */}
                 <div
                   className="absolute inset-0 z-10 cursor-default"
                   style={{ background: "transparent" }}
                   onContextMenu={(e) => e.preventDefault()}
                   onMouseDown={(e) => e.preventDefault()}
                   onCopy={(e) => e.preventDefault()}
-                  onWheel={(e) => {
-                    // Forward scroll events to the iframe beneath
-                    const iframe = e.currentTarget.previousElementSibling as HTMLIFrameElement | null;
-                    if (iframe?.contentWindow) {
-                      iframe.contentWindow.scrollBy({ top: e.deltaY, left: e.deltaX, behavior: "auto" });
-                    }
-                  }}
                 />
               </div>
             ) : (

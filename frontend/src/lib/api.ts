@@ -105,6 +105,9 @@ export const lmsAPI = {
   completeCourse: (programId: string, courseId: string) =>
     api.post(`/lms/enrollments/${programId}/complete-course`, { courseId }),
 
+  markProgramComplete: (programId: string) =>
+    api.post(`/lms/enrollments/${programId}/mark-complete`),
+
   submitTest: (programId: string, data: { courseId: string; testId: string; answers: number[] }) =>
     api.post(`/lms/enrollments/${programId}/submit-test`, data),
 
