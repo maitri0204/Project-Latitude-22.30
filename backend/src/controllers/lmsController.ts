@@ -1,6 +1,8 @@
 import { Request, Response } from "express";
 import mongoose from "mongoose";
-import LMSProgram, { LMSEnrollment } from "../models/LMSProgram";
+import LMSProgram from "../models/LMSProgram";
+import LMSEnrollment from "../models/LMSEnrollment";
+import Wishlist from "../models/Wishlist";
 import { AuthRequest } from "../middleware/auth";
 import { USER_ROLE } from "../types/roles";
 import path from "path";
@@ -872,7 +874,6 @@ export const getWishlist = async (
   res: Response
 ): Promise<void> => {
   try {
-    const { Wishlist } = await import("../models/LMSProgram");
     const items = await Wishlist.find({ userId: req.user._id }).populate("programId");
     res.status(200).json({ wishlist: items });
   } catch (error: any) {
@@ -888,7 +889,6 @@ export const addToWishlist = async (
 ): Promise<void> => {
   try {
     const { programId } = req.params;
-    const { Wishlist } = await import("../models/LMSProgram");
     const exists = await Wishlist.findOne({ userId: req.user._id, programId });
     if (exists) { res.status(400).json({ message: "Already in wishlist." }); return; }
     const item = new Wishlist({ userId: req.user._id, programId });
@@ -907,7 +907,6 @@ export const removeFromWishlist = async (
 ): Promise<void> => {
   try {
     const { programId } = req.params;
-    const { Wishlist } = await import("../models/LMSProgram");
     await Wishlist.deleteOne({ userId: req.user._id, programId });
     res.status(200).json({ message: "Removed from wishlist." });
   } catch (error: any) {

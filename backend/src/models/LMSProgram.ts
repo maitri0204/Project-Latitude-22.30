@@ -71,29 +71,7 @@ export interface ILMSProgram extends Document {
   updatedAt: Date;
 }
 
-export interface ILMSEnrollment extends Document {
-  userId: mongoose.Types.ObjectId;
-  programId: mongoose.Types.ObjectId;
-  enrolledAt: Date;
-  completedCourses: mongoose.Types.ObjectId[];
-  completedTests: mongoose.Types.ObjectId[];
-  testScores: {
-    testId: mongoose.Types.ObjectId;
-    score: number;
-    totalScore: number;
-    passed: boolean;
-    completedAt: Date;
-  }[];
-  passedTests: mongoose.Types.ObjectId[];
-  testAnswers: {
-    testId: mongoose.Types.ObjectId;
-    answers: number[];
-  }[];
-  status: "ENROLLED" | "IN_PROGRESS" | "COMPLETED";
-  certificateIssuedAt?: Date;
-}
-
-// ─── Schemas ───
+// ─── Sub-Schemas ───
 
 const LMSTestQuestionSchema = new Schema<ILMSTestQuestion>({
   questionText: { type: String, required: true },
@@ -139,6 +117,8 @@ const LMSCourseSchema = new Schema<ILMSCourse>({
   materials: [LMSCourseMaterialSchema],
 });
 
+// ─── Main Schema ───
+
 const LMSProgramSchema = new Schema<ILMSProgram>(
   {
     adminId: { type: Schema.Types.ObjectId, ref: "User", required: true },
@@ -160,61 +140,4 @@ const LMSProgramSchema = new Schema<ILMSProgram>(
   { timestamps: true }
 );
 
-const LMSEnrollmentSchema = new Schema<ILMSEnrollment>(
-  {
-    userId: { type: Schema.Types.ObjectId, ref: "User", required: true },
-    programId: {
-      type: Schema.Types.ObjectId,
-      ref: "LMSProgram",
-      required: true,
-    },
-    enrolledAt: { type: Date, default: Date.now },
-    completedCourses: [{ type: Schema.Types.ObjectId }],
-    completedTests: [{ type: Schema.Types.ObjectId }],
-    testScores: [
-      {
-        testId: { type: Schema.Types.ObjectId },
-        score: { type: Number },
-        totalScore: { type: Number },
-        passed: { type: Boolean, default: false },
-        completedAt: { type: Date },
-      },
-    ],
-    passedTests: [{ type: Schema.Types.ObjectId }],
-    testAnswers: [
-      {
-        testId: { type: Schema.Types.ObjectId },
-        answers: [{ type: Number }],
-      },
-    ],
-    status: {
-      type: String,
-      enum: ["ENROLLED", "IN_PROGRESS", "COMPLETED"],
-      default: "ENROLLED",
-    },
-    certificateIssuedAt: { type: Date },
-  },
-  { timestamps: true }
-);
-
-LMSEnrollmentSchema.index({ userId: 1, programId: 1 }, { unique: true });
-
-// ─── Wishlist ───
-const WishlistSchema = new Schema(
-  {
-    userId: { type: Schema.Types.ObjectId, ref: "User", required: true },
-    programId: { type: Schema.Types.ObjectId, ref: "LMSProgram", required: true },
-  },
-  { timestamps: true }
-);
-WishlistSchema.index({ userId: 1, programId: 1 }, { unique: true });
-
-const LMSProgram = mongoose.model<ILMSProgram>("LMSProgram", LMSProgramSchema);
-export const LMSEnrollment = mongoose.model<ILMSEnrollment>(
-  "LMSEnrollment",
-  LMSEnrollmentSchema
-);
-
-export const Wishlist = mongoose.models.Wishlist || mongoose.model("Wishlist", WishlistSchema);
-
-export default LMSProgram;
+export default mongoose.model<ILMSProgram>("LMSProgram", LMSProgramSchema);

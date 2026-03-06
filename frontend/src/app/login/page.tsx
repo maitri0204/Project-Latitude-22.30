@@ -56,9 +56,6 @@ function LoginPageContent() {
     try {
       const res = await authAPI.login({ email: email.trim().toLowerCase() });
       toast.success(res.data.message || "OTP sent to your email");
-      if (res.data.otp) {
-        toast(`Dev OTP: ${res.data.otp}`, { icon: "🔑", duration: 10000 });
-      }
       setIsSignupOtp(false);
       setStep("otp");
     } catch (error: any) {
@@ -89,9 +86,6 @@ function LoginPageContent() {
         email: email.trim().toLowerCase(),
       });
       toast.success(res.data.message || "Signup successful. Check your email for OTP.");
-      if (res.data.otp) {
-        toast(`Dev OTP: ${res.data.otp}`, { icon: "🔑", duration: 10000 });
-      }
       setIsSignupOtp(true);
       setStep("otp");
     } catch (error: any) {

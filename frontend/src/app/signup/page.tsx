@@ -48,9 +48,6 @@ export default function SignupPage() {
         email: email.trim().toLowerCase(),
       });
       toast.success(res.data.message || "Account created! Check your email for OTP.");
-      if (res.data.otp) {
-        toast(`Dev OTP: ${res.data.otp}`, { icon: "🔑", duration: 10000 });
-      }
       setStep("otp");
     } catch (error: any) {
       toast.error(error.response?.data?.message || "Signup failed");
