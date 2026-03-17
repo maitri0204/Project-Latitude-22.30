@@ -51,10 +51,10 @@ export default function Certificate({
       ctx.drawImage(img, 0, 0);
 
       /* ---- region that contains placeholder text (image-px) ---- */
-      const rx = Math.round(W * 0.30);
+      const rx = Math.round(W * 0.42);
       const ry = Math.round(H * 0.29);
       const rr = Math.round(W * 0.99);
-      const rb = Math.round(H * 0.76);
+      const rb = Math.round(H * 0.80);
       const rw = rr - rx;
       const rh = rb - ry;
 
@@ -63,7 +63,7 @@ export default function Certificate({
       tmp.width = W;
       tmp.height = H;
       const tmpCtx = tmp.getContext("2d")!;
-      tmpCtx.filter = "blur(120px)";
+      tmpCtx.filter = "blur(50px)";
       tmpCtx.drawImage(img, 0, 0);
       tmpCtx.filter = "none";
 
@@ -226,7 +226,7 @@ export default function Certificate({
         >
           <p
             style={{
-              fontSize: "13px",
+              fontSize: "15px",
               color: "#444",
               fontFamily: "'Georgia', 'Times New Roman', serif",
               lineHeight: 1.8,
