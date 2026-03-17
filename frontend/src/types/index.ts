@@ -124,7 +124,7 @@ export interface WishlistItem {
 
 export interface DashboardEnrollment {
   _id: string;
-  user: { _id: string; firstName: string; middleName?: string; lastName: string; email: string };
+  user: { _id: string; firstName: string; middleName?: string; lastName: string; email: string; mobile?: string; country?: string; state?: string; city?: string };
   program: { _id: string; name: string; courses: any[] };
   enrolledAt: string;
   status: "NOT_STARTED" | "IN_PROGRESS" | "COMPLETED";

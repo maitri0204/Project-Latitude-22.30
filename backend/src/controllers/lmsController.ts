@@ -3,6 +3,7 @@ import mongoose from "mongoose";
 import LMSProgram from "../models/LMSProgram";
 import LMSEnrollment from "../models/LMSEnrollment";
 import Wishlist from "../models/Wishlist";
+import User from "../models/User";
 import { AuthRequest } from "../middleware/auth";
 import { USER_ROLE } from "../types/roles";
 import path from "path";
@@ -18,7 +19,7 @@ export const createProgram = async (
   res: Response
 ): Promise<void> => {
   try {
-    const { name, brief, totalDuration, author, whatYouLearn, fees, courses, sampleVideoUrl, thumbnailPath, category, subCategory } =
+    const { name, brief, totalDuration, author, whatYouLearn, fees, courses, sampleVideoUrl, sampleVideoOneDriveItemId, thumbnailPath, category, subCategory } =
       req.body;
 
     if (!name || !brief || !totalDuration || !author) {
@@ -27,6 +28,14 @@ export const createProgram = async (
       });
       return;
     }
+
+    // Strip out courses/videos/tests with empty titles to avoid Mongoose validation errors
+    const sanitizedCourses = (courses || []).filter((c: any) => c.title?.trim()).map((c: any) => ({
+      ...c,
+      title: c.title.trim(),
+      videos: (c.videos || []).filter((v: any) => v.title?.trim()).map((v: any) => ({ ...v, title: v.title.trim() })),
+      tests: (c.tests || []).filter((t: any) => t.title?.trim()).map((t: any) => ({ ...t, title: t.title.trim() })),
+    }));
 
     const program = new LMSProgram({
       adminId: req.user._id,
@@ -37,10 +46,11 @@ export const createProgram = async (
       whatYouLearn: whatYouLearn || [],
       fees: fees || 0,
       sampleVideoUrl: sampleVideoUrl || "",
+      sampleVideoOneDriveItemId: sampleVideoOneDriveItemId || "",
       thumbnailPath: thumbnailPath || "",
       category: category?.trim() || "General",
       subCategory: subCategory?.trim() || "",
-      courses: courses || [],
+      courses: sanitizedCourses,
       isPublished: false,
     });
 
@@ -52,6 +62,11 @@ export const createProgram = async (
     });
   } catch (error: any) {
     console.error("Create program error:", error);
+    if (error.name === "ValidationError") {
+      const messages = Object.values(error.errors).map((e: any) => e.message).join(", ");
+      res.status(400).json({ message: `Validation error: ${messages}` });
+      return;
+    }
     res.status(500).json({ message: "Server error creating program." });
   }
 };
@@ -146,6 +161,15 @@ export const updateProgram = async (
       return;
     }
 
+    // Strip out courses/videos/tests with empty titles
+    if (req.body.courses) {
+      req.body.courses = req.body.courses.filter((c: any) => c.title?.trim()).map((c: any) => ({
+        ...c,
+        title: c.title.trim(),
+        videos: (c.videos || []).filter((v: any) => v.title?.trim()).map((v: any) => ({ ...v, title: v.title.trim() })),
+        tests: (c.tests || []).filter((t: any) => t.title?.trim()).map((t: any) => ({ ...t, title: t.title.trim() })),
+      }));
+    }
     const updateData = req.body;
     const updatedProgram = await LMSProgram.findByIdAndUpdate(
       programId,
@@ -833,7 +857,7 @@ export const getDashboardStats = async (
 ): Promise<void> => {
   try {
     const enrollments = await LMSEnrollment.find()
-      .populate("userId", "firstName middleName lastName email")
+      .populate("userId", "firstName middleName lastName email mobile country state city")
       .populate("programId", "name courses");
 
     // Determine real status: ENROLLED but hasn't watched any video = "NOT_STARTED",
@@ -861,7 +885,14 @@ export const getDashboardStats = async (
     const inProgress = data.filter((d: any) => d.status === "IN_PROGRESS").length;
     const notStarted = data.filter((d: any) => d.status === "NOT_STARTED").length;
 
-    res.status(200).json({ total, completed, inProgress, notStarted, enrollments: data });
+    // Total registered users (role = USER only, excludes admins)
+    const totalRegisteredUsers = await User.countDocuments({ role: "USER", isVerified: true });
+    const registeredUsers = await User.find({ role: "USER", isVerified: true })
+      .select("firstName middleName lastName email mobile country state city createdAt")
+      .sort({ createdAt: -1 })
+      .lean();
+
+    res.status(200).json({ total, completed, inProgress, notStarted, enrollments: data, totalRegisteredUsers, registeredUsers });
   } catch (error: any) {
     console.error("Dashboard stats error:", error);
     res.status(500).json({ message: "Server error." });

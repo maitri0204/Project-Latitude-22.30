@@ -73,7 +73,7 @@ export default function UserLayout({ children }: { children: React.ReactNode }) 
   return (
     <div className="min-h-screen flex bg-gray-50">
       {/* Sidebar */}
-      <aside className="w-64 bg-white border-r border-gray-200 h-[calc(100vh-4rem)] flex flex-col fixed left-0 top-16 z-30">
+      <aside className="w-64 bg-white border-r border-gray-200 h-[calc(100vh-6.25rem)] flex flex-col fixed left-0 top-25 z-30">
 
         {/* Nav */}
         <nav className="flex-1 px-2 py-4 space-y-1 overflow-y-auto">

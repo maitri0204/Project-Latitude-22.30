@@ -5,6 +5,7 @@ import { useParams, useRouter, useSearchParams } from "next/navigation";
 import toast from "react-hot-toast";
 import { lmsAPI } from "@/lib/api";
 import { LMSProgram, LMSEnrollment, LMSCourse } from "@/types";
+import Certificate from "@/components/Certificate";
 
 const BASE_URL =
   process.env.NEXT_PUBLIC_API_URL?.replace("/api", "") || "http://localhost:5000";
@@ -894,73 +895,29 @@ export default function ProgramDetailPage() {
 
           {/* Certificate */}
           <div id="certificate-section" className="mb-6">
-            <div className="bg-white rounded-2xl border border-amber-200 shadow-lg overflow-hidden">
-              <div className="px-6 py-4 bg-amber-50 border-b border-amber-100 flex items-center justify-between">
+            <div className="bg-white rounded-2xl border border-amber-200 shadow-lg overflow-x-auto">
+              <div className="px-6 py-4 bg-amber-50 border-b border-amber-100">
                 <h3 className="font-bold text-amber-800 flex items-center gap-2">
                   <svg className="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"/>
                   </svg>
-                  Certificate of Completion
+                  Your Certificate
                 </h3>
-                <button
-                  onClick={() => window.print()}
-                  className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-xs font-medium transition-colors"
-                >
-                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/>
-                  </svg>
-                  Print / Save PDF
-                </button>
               </div>
-
-              {/* Certificate body */}
-              <div
-                id="printable-certificate"
-                className="relative min-h-[420px] flex flex-col items-center justify-center p-10 text-center overflow-hidden"
-              >
-                {/* Decorative certificate background */}
-                <div className="absolute inset-0 bg-gradient-to-br from-amber-50 via-yellow-50 to-orange-50">
-                  {/* Border decoration */}
-                  <div className="absolute inset-3 border-4 border-amber-300/40 rounded-2xl pointer-events-none" />
-                  <div className="absolute inset-5 border border-amber-200/30 rounded-xl pointer-events-none" />
-                </div>
-
-                <div className="relative z-10 space-y-4">
-                  {/* Seal */}
-                  <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-amber-100 border-4 border-amber-400 shadow-lg mb-2">
-                    <span className="text-3xl">🏆</span>
-                  </div>
-
-                  <div>
-                    <p className="text-sm font-medium text-amber-700 uppercase tracking-widest mb-1">This is to certify that</p>
-                    <h1 className="text-3xl md:text-4xl font-extrabold text-gray-900">
-                      {currentUser
-                        ? `${currentUser.firstName}${currentUser.middleName ? " " + currentUser.middleName : ""} ${currentUser.lastName}`
-                        : "Participant"
-                      }
-                    </h1>
-                  </div>
-
-                  <p className="text-gray-600 text-base">has successfully completed the course</p>
-
-                  <div>
-                    <h2 className="text-xl md:text-2xl font-bold text-blue-700">{program.name}</h2>
-                    {program.totalDuration && (
-                      <p className="text-base text-gray-700 mt-1">{program.totalDuration} · by {program.author}</p>
-                    )}
-                  </div>
-
-                  <div className="pt-4">
-                    <div className="inline-block border-t-2 border-gray-400 pt-2">
-                      <p className="text-sm text-gray-700">Date of Completion</p>
-                      <p className="text-base font-semibold text-gray-900">
-                        {enrollment.certificateIssuedAt
-                          ? new Date(enrollment.certificateIssuedAt).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" })
-                          : new Date().toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" })}
-                      </p>
-                    </div>
-                  </div>
-                </div>
+              <div className="p-4">
+                <Certificate
+                  userName={
+                    currentUser
+                      ? `${currentUser.firstName}${currentUser.middleName ? " " + currentUser.middleName : ""} ${currentUser.lastName}`
+                      : "Participant"
+                  }
+                  programName={program.name}
+                  completionDate={
+                    enrollment.certificateIssuedAt
+                      ? new Date(enrollment.certificateIssuedAt).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" })
+                      : new Date().toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" })
+                  }
+                />
               </div>
             </div>
           </div>

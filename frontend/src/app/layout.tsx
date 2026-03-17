@@ -16,8 +16,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Latitude LMS",
-  description: "Latitude Learning Management System",
+  title: "LMS",
+  description: "Learning Management System",
 };
 
 export default function RootLayout({

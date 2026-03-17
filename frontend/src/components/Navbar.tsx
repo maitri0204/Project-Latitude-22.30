@@ -53,21 +53,11 @@ export default function Navbar() {
   return (
     <nav className="bg-white sticky top-0 z-50 shadow-lg border-b border-gray-200">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between h-16 items-center">
+        <div className="flex justify-between h-25 items-center">
           {/* Logo and Brand */}
           <div className="flex items-center">
-            <Link href="/" className="flex items-center gap-2.5 group">
-              <div className="w-9 h-9 bg-gradient-to-br from-blue-600 to-cyan-600 rounded-xl flex items-center justify-center shadow-md group-hover:shadow-lg transition-all duration-300 group-hover:scale-105">
-                <span className="text-white font-bold text-lg">L</span>
-              </div>
-              <div className="hidden sm:block">
-                <p className="font-bold text-gray-900 text-lg leading-none tracking-tight">
-                  Latitude
-                </p>
-                <p className="text-[11px] text-gray-500 leading-none mt-0.5">
-                  Learning Hub
-                </p>
-              </div>
+            <Link href="/" className="flex items-center gap-1 group">
+              <img src="/logo.png" alt="Latitude" className="h-21 w-auto object-contain group-hover:scale-105 transition-all duration-300" />
             </Link>
           </div>
 

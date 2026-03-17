@@ -141,6 +141,14 @@ export default function AdminProgramsPage() {
       const data = {
         ...formData,
         whatYouLearn: formData.whatYouLearn.filter((w) => w.trim()),
+        // Strip courses/videos/tests with empty titles before saving
+        courses: formData.courses
+          .filter((c) => c.title?.trim())
+          .map((c) => ({
+            ...c,
+            videos: c.videos.filter((v) => v.title?.trim()),
+            tests: c.tests.filter((t) => t.title?.trim()),
+          })),
       };
 
       if (viewMode === "create") {

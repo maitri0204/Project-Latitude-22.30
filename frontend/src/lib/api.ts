@@ -1,6 +1,6 @@
 import axios from "axios";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api";
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5003/api";
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -37,7 +37,7 @@ api.interceptors.response.use(
 
 // ─── Auth API ───
 export const authAPI = {
-  signup: (data: { firstName: string; middleName?: string; lastName: string; email: string }) =>
+  signup: (data: { firstName: string; middleName?: string; lastName: string; email: string; mobile?: string; country?: string; state?: string; city?: string }) =>
     api.post("/auth/signup", data),
 
   verifySignupOTP: (data: { email: string; otp: string }) =>
