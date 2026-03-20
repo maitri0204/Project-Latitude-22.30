@@ -190,7 +190,7 @@ export default function Certificate({
         <div
           style={{
             position: "absolute",
-            top: "265px",
+            top: "285px",
             left: "335px",
             right: "15px",
             textAlign: "center",
